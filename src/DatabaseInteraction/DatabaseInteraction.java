@@ -1,7 +1,5 @@
 package DatabaseInteraction;
 
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 import java.sql.*;
 import java.util.ArrayList;
 
@@ -10,18 +8,16 @@ public class DatabaseInteraction {
     private Connection connection;
     private ResultSet resultSet;
     private ResultSetMetaData rsmd;
-    private DatabaseMetaData dbmd;
+    private DatabaseMetaData dbMeta;
     private ArrayList<String> tables;
     String tableNameQuery = "select table_name FROM information_schema.tables where table_schema='public';";
+    String tableNameCountQuery = "select count(*) FROM information_schema.tables where table_schema='public';";
 
-    public DatabaseInteraction(JTable jt){
+    public DatabaseInteraction(){
         try {
             tables = new ArrayList<>();
             createConnection();
-
-            //for(String s : tables)
-                //System.out.println(s);
-
+            dbMeta = connection.getMetaData();
         } catch(Exception ex){
             ex.printStackTrace();
         }
@@ -43,17 +39,53 @@ public class DatabaseInteraction {
         System.out.println("Connection closed");
     }
 
-    public ResultSet interact(String query) throws Exception{
+    public ResultSet sendSelect(String query) throws Exception{
         PreparedStatement ps = connection.prepareStatement(query);
+        System.out.println("QueryInteracter: "+query);
+        return ps.executeQuery();
+    }
+    public void sendUpdate(String query) throws Exception{
+        PreparedStatement ps = connection.prepareStatement(query);
+        System.out.println("QueryInteracter: "+query);
+        ps.executeUpdate();
+    }
 
+    public String[] getTables() throws Exception {
+        ResultSet rs = sendSelect(tableNameCountQuery);
+        ResultSetMetaData rsMeta = rs.getMetaData();
+        int tableCount = 0;
+        while(rs.next()){
+            tableCount = rs.getInt(1);
+        }
+        rs = sendSelect(tableNameQuery);
+        rsMeta = rs.getMetaData();
+        String[] colNameList = new String[tableCount+1];
+        colNameList[0] = "[Select]";
+        int i = 1;
+        while(rs.next()){
+            String str = rs.getString("table_name");
+            System.out.println(str);
+            colNameList[i] = str;
+            i++;
+        }
+        for(String s : colNameList)
+            System.out.println(s);
+
+        return colNameList;
+    }
+
+    public ArrayList<String> getColumns(String colName)throws Exception{
         ArrayList<String> list = new ArrayList<>();
-        resultSet = ps.executeQuery();
-
-        return resultSet;
+        ResultSet rs = sendSelect("select * from "+colName);
+        ResultSetMetaData rsMeta = rs.getMetaData();
+        int count = 1;
+        while(count <= rsMeta.getColumnCount()){
+            list.add(rsMeta.getColumnName(count));
+            System.out.println(rsMeta.getColumnName(count));
+            count++;
+        }
+        return list;
     }
 
-    public void getTables(){
-
-    }
 
 }
