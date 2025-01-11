@@ -7,11 +7,13 @@ public class SelectQueryBuilder {
     private ArrayList<String> columns;
     private ArrayList<String> tables;
     private ArrayList<String> conditions;
+    private ArrayList<Filter> filters;
 
     public SelectQueryBuilder(){
         columns = new ArrayList<>();
         tables = new ArrayList<>();
         conditions = new ArrayList<>();
+        filters = new ArrayList<>();
     }
 
     public void select(String ... columns){
@@ -27,6 +29,12 @@ public class SelectQueryBuilder {
     public void where(String ... conditions){
         for(String s : conditions){
             this.conditions.add(s);
+        }
+    }
+
+    public void orderBy(ArrayList<Filter> filters){
+        for(Filter f : filters){
+            this.filters.add(f);
         }
     }
 
@@ -55,9 +63,23 @@ public class SelectQueryBuilder {
                 }
             }
         }
+        if(!filters.isEmpty()) {
+            sb.append(" ORDER BY");
+            for (int i = 0; i < filters.size(); i++) {
+                sb.append(" " + filters.get(i).getFilterName());
+                sb.append(" " + filters.get(i).getFilterStatus().toString());
+                if (i < filters.size() - 1) {
+                    sb.append(",");
+                }
+            }
+        }
+
+
+
         sb.append(";");
         System.out.println("SelectQueryBuilder: "+sb.toString());
         return sb.toString();
     }
+
 
 }

@@ -41,12 +41,12 @@ public class DatabaseInteraction {
 
     public ResultSet sendSelect(String query) throws Exception{
         PreparedStatement ps = connection.prepareStatement(query);
-        System.out.println("QueryInteracter: "+query);
+        System.out.println("QueryInteracter(select): "+query);
         return ps.executeQuery();
     }
     public void sendUpdate(String query) throws Exception{
         PreparedStatement ps = connection.prepareStatement(query);
-        System.out.println("QueryInteracter: "+query);
+        System.out.println("QueryInteracter(update): "+query);
         ps.executeUpdate();
     }
 
@@ -64,12 +64,12 @@ public class DatabaseInteraction {
         int i = 1;
         while(rs.next()){
             String str = rs.getString("table_name");
-            System.out.println(str);
+//            System.out.println(str);
             colNameList[i] = str;
             i++;
         }
-        for(String s : colNameList)
-            System.out.println(s);
+//        for(String s : colNameList)
+//            System.out.print(s);
 
         return colNameList;
     }
@@ -81,7 +81,7 @@ public class DatabaseInteraction {
         int count = 1;
         while(count <= rsMeta.getColumnCount()){
             list.add(rsMeta.getColumnName(count));
-            System.out.println(rsMeta.getColumnName(count));
+//            System.out.println(rsMeta.getColumnName(count));
             count++;
         }
         return list;

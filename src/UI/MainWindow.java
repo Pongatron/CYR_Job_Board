@@ -5,34 +5,38 @@ import DatabaseInteraction.*;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
+import java.awt.event.*;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-public class MainWindow extends JFrame implements ActionListener{
+import static DatabaseInteraction.Filter.FilterStatus.*;
 
-    DatabaseInteraction database;
-    JPanel leftPanel;
-    JPanel rightPanel;
-    JPanel centerPanel;
-    JPanel topPanel;
-    JPanel filterListPanel;
+public class MainWindow extends JFrame implements ActionListener, MouseListener {
 
-    JButton insertButton;
-    JToolBar mainBar;
-    JScrollPane filterScroll;
-    JScrollPane tableScroll;
+    private DatabaseInteraction database;
+    private JPanel leftPanel;
+    private JPanel rightPanel;
+    private JPanel centerPanel;
+    private JPanel topPanel;
+    private JPanel filterListPanel;
 
-    JLabel filtersLabel = new JLabel("Filters:");
+    private JOptionPane insertPane;
 
-    JTable table;
-    JComboBox tablesComboBox;
-    ArrayList<String> filterList;
+    private JButton insertButton;
+    private JToolBar mainBar;
+    private JScrollPane filterScroll;
+    private JScrollPane tableScroll;
+
+    private JLabel filtersLabel = new JLabel("Filters:");
+
+    private JTable table;
+    private JComboBox tablesComboBox;
+    private ArrayList<String> filterList;
+    private InsertWindow insertWindow;
+
+    private boolean sortOrder = true;
 
     public MainWindow() throws Exception{
 
@@ -41,6 +45,7 @@ public class MainWindow extends JFrame implements ActionListener{
 
         mainBar.add(tablesComboBox);
         mainBar.add(filterScroll);
+        mainBar.add(insertButton);
         centerPanel.add(tableScroll);
         filterListPanel.add(filtersLabel);
 
@@ -59,6 +64,14 @@ public class MainWindow extends JFrame implements ActionListener{
     }
 
     public void initializeComponents()throws Exception{
+        table = new JTable();
+        table.getTableHeader().addMouseListener(this);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        table.setDefaultEditor(Object.class, null);
+        table.getTableHeader().setReorderingAllowed(false);
+
+        filterList = new ArrayList<>();
+
         leftPanel = new JPanel();
         leftPanel.setBackground(Color.PINK);
         leftPanel.setPreferredSize(new Dimension(20, 100));
@@ -70,34 +83,36 @@ public class MainWindow extends JFrame implements ActionListener{
         topPanel = new JPanel();
         topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.LINE_AXIS));
         topPanel.setBackground(Color.lightGray);
-        //topPanel.setPreferredSize(new Dimension(50, 100));
 
         centerPanel = new JPanel();
         centerPanel.setLayout(new BorderLayout());
         centerPanel.setBackground(Color.GRAY);
-        //centerPanel.setPreferredSize(new Dimension(500, 50));
 
         filterListPanel = new JPanel();
         filterListPanel.setLayout(new BoxLayout(filterListPanel,BoxLayout.Y_AXIS));
-        //filterListPanel.setPreferredSize(topPanel.getPreferredSize());
-
-        table = new JTable();
 
         mainBar = new JToolBar();
+        mainBar.setFloatable(false);
+        mainBar.setPreferredSize(new Dimension(500, 100));
+        mainBar.setMinimumSize(new Dimension(10, 100));
 
         filterScroll = new JScrollPane(filterListPanel);
         filterScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        filterScroll.setPreferredSize(new Dimension(100, 100));
+        filterScroll.setMaximumSize(new Dimension(200, 100));
 
         tableScroll = new JScrollPane(table);
+        tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        tableScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
 
         tablesComboBox = new JComboBox(database.getTables());
         tablesComboBox.addActionListener(this);
+        tablesComboBox.setMaximumSize(tablesComboBox.getPreferredSize());
 
-        filterList = new ArrayList<>();
-
+        insertButton = new JButton("Insert");
+        insertButton.addActionListener(this);
+        filters = new ArrayList<>();
     }
-
+/*
     public void refreshFilters(String tableName)throws Exception{
         filterList = database.getColumns(tableName);
         filterListPanel.add(filtersLabel);
@@ -109,54 +124,41 @@ public class MainWindow extends JFrame implements ActionListener{
         this.validate();
         this.repaint();
     }
-
+*/
     public void clearFilters(){
         filterListPanel.removeAll();
     }
 
-    public void setTable(ResultSet resultSet) throws SQLException {
+    public void loadTable(ResultSet rs) throws SQLException {
 
-        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        table.setDefaultEditor(Object.class, null);
-        ResultSetMetaData rsMetaData = resultSet.getMetaData();
+        ResultSetMetaData rsMeta = rs.getMetaData();
         DefaultTableModel tableModel = new DefaultTableModel();
-        int colCount = rsMetaData.getColumnCount();
+        int colCount = rsMeta.getColumnCount();
 
         for(int i = 1; i <= colCount; i++){
-            tableModel.addColumn(rsMetaData.getColumnLabel(i));
+            tableModel.addColumn(rsMeta.getColumnLabel(i));
         }
 
         Object[] row = new Object[colCount];
-        while (resultSet.next()){
+        while (rs.next()){
             for(int i = 0; i < colCount; i++){
-                row[i] = resultSet.getObject(i + 1);
+                row[i] = rs.getObject(i + 1);
             }
             tableModel.addRow(row);
         }
 
-        //table.setModel(tableModel);
-        for(int i = 0; i < 5; i++){
-            tableModel.addColumn("M");
-            tableModel.addColumn("T");
-            tableModel.addColumn("W");
-            tableModel.addColumn("TH");
-            tableModel.addColumn("F");
-        }
-
         table.setModel(tableModel);
-
-        //table.setRowSorter(ts);
-        table.getTableHeader().setReorderingAllowed(false);
-        modifyTable();for(int i = colCount; i < table.getColumnCount(); i++){
+        modifyTable();
+        for(int i = colCount; i < table.getColumnCount(); i++){
             TableColumn col = table.getColumnModel().getColumn(i);
             col.setPreferredWidth(30);
             col.setMaxWidth(30);
             col.setMinWidth(40);
-
         }
     }
 
     public void modifyTable(){
+
         TableColumnModel columnModel = table.getColumnModel();
         for (int column = 0; column < table.getColumnCount(); column++) {
             int maxWidth = 0;
@@ -179,29 +181,107 @@ public class MainWindow extends JFrame implements ActionListener{
     @Override
     public void actionPerformed(ActionEvent e) {
         try{
-
             if(e.getSource() == tablesComboBox && !tablesComboBox.getSelectedItem().equals("[Select]")){
-                System.out.println(tablesComboBox.getSelectedItem().toString());
-                System.out.println("SelectedItem: "+ tablesComboBox.getSelectedItem());
                 SelectQueryBuilder qb = new SelectQueryBuilder();
                 qb.select("*");
                 qb.from((String) tablesComboBox.getSelectedItem());
-                setTable(database.sendSelect(qb.build()));
+                loadTable(database.sendSelect(qb.build()));
                 clearFilters();
-                refreshFilters(tablesComboBox.getSelectedItem().toString());
+                //refreshFilters(tablesComboBox.getSelectedItem().toString());
                 this.validate();
                 this.repaint();
             }
             if(e.getSource() == insertButton){
-                InsertQueryBuilder ib = new InsertQueryBuilder();
-                ib.insertInto("jobs");
-                ib.values("6", "customer 9", "now()", "desk", "1-2-2026");
-                database.sendUpdate(ib.build());
+
+                insertWindow = new InsertWindow(database);
+
             }
+
 
         } catch(Exception ee){
             ee.printStackTrace();
         }
+
+    }
+
+    ArrayList<Filter> filters;
+    @Override
+    public void mouseClicked(MouseEvent e) {
+        if(e.getClickCount() == 1){
+            try {
+                filterListPanel.removeAll();
+                int col = table.columnAtPoint(e.getPoint());
+                String name = table.getColumnName(col);
+                SelectQueryBuilder qb = new SelectQueryBuilder();
+                qb.select("*");
+                qb.from("jobs");
+
+
+
+                boolean found = false;
+                if(!filters.isEmpty()) {
+                    for (Filter f : filters) {
+                        if(f.getFilterName().equals(name)) {
+                            found = true;
+                            switch (f.getFilterStatus()) {
+                                case ASC:
+                                    f.setFilterStatus(DESC);
+                                    break;
+                                case DESC:
+                                    filters.remove(f);
+                                    break;
+                            }
+                        }
+                        if(found){
+                            break;
+                        }
+                    }
+                    if(!found){
+                        filters.add(new Filter(name, ASC));
+                    }
+
+                }
+                else{
+                    filters.add(new Filter(name, ASC));
+                }
+
+
+                if(!filters.isEmpty()) {
+                    qb.orderBy(filters);
+                }
+
+                filterListPanel.add(filtersLabel);
+                for(Filter f : filters){
+                    JLabel label = new JLabel(f.getFilterName() + " " + f.getFilterStatus());
+                    label.setFocusable(false);
+                    filterListPanel.add(label);
+                }
+                loadTable(database.sendSelect(qb.build()));
+                this.validate();
+                this.repaint();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
 
     }
 }
