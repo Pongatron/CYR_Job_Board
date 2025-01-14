@@ -3,6 +3,9 @@ package UI;
 import DatabaseInteraction.DatabaseInteraction;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.EtchedBorder;
+import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -10,28 +13,25 @@ import java.util.ArrayList;
 
 public class InsertWindow extends JFrame {
 
-    ArrayList<JLabel> labels;
-    ArrayList<JTextField> fields;
+    JPanel containerPanel;
+    int maxWidth = 0;
+    int maxHeight = 0;
 
     public InsertWindow(DatabaseInteraction database)throws Exception{
 
-        labels = new ArrayList<>();
-        fields = new ArrayList<>();
-        ResultSet rs = database.sendSelect("select * from customers");
+        ResultSet rs = database.sendSelect("select * from jobs");
+
+        containerPanel = new JPanel();
+        containerPanel.setLayout(new GridLayout(0,2));
+        containerPanel.setBorder(new EmptyBorder(5,5,5,5));
         createComponents(rs);
 
-        for(int i = 0; i < labels.size(); i++){
-            this.add(labels.get(i));
-            this.add(fields.get(i));
-        }
+        this.add(containerPanel);
 
+        //this.setMinimumSize(new Dimension(maxWidth,maxHeight));
 
-        this.setLayout(new GridLayout(labels.size(), 2, 5, 5));
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        //this.setPreferredSize(new Dimension(500, 200));
-        this.setMinimumSize(new Dimension(500, 200));
         this.pack();
-        this.setResizable(false);
         this.setLocationRelativeTo(null);
         this.setVisible(true);
 
@@ -41,11 +41,19 @@ public class InsertWindow extends JFrame {
         ResultSetMetaData rsMeta = rs.getMetaData();
         int colCount = rsMeta.getColumnCount();
         for(int i = 1; i <= colCount; i++){
+
             JLabel label = new JLabel(rsMeta.getColumnName(i));
+            label.setHorizontalAlignment(SwingConstants.RIGHT);
+            label.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));
+
             JTextField textField = new JTextField();
             textField.setMinimumSize(new Dimension(100, 30));
-            labels.add(label);
-            fields.add(textField);
+            textField.setMaximumSize(new Dimension(100, 30));
+            textField.setPreferredSize(new Dimension(100, 30));
+            textField.setBorder(BorderFactory.createEtchedBorder(EtchedBorder.RAISED));
+
+            containerPanel.add(label);
+            containerPanel.add(textField);
         }
     }
 

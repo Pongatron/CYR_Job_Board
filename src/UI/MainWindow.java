@@ -3,6 +3,7 @@ package UI;
 import DatabaseInteraction.*;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -25,6 +26,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JOptionPane insertPane;
 
     private JButton insertButton;
+    private JButton createTableButton;
     private JToolBar mainBar;
     private JScrollPane filterScroll;
     private JScrollPane tableScroll;
@@ -35,6 +37,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JComboBox tablesComboBox;
     private ArrayList<String> filterList;
     private InsertWindow insertWindow;
+    private ArrayList<Filter> filters;
 
     private boolean sortOrder = true;
 
@@ -46,6 +49,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         mainBar.add(tablesComboBox);
         mainBar.add(filterScroll);
         mainBar.add(insertButton);
+        mainBar.add(createTableButton);
         centerPanel.add(tableScroll);
         filterListPanel.add(filtersLabel);
 
@@ -56,7 +60,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setPreferredSize(new Dimension(1000, 600));
-        this.setMinimumSize(new Dimension(800, 600));
+        this.setMinimumSize(new Dimension(800, 100));
         this.pack();
         this.setLocationRelativeTo(null);
         this.setVisible(true);
@@ -69,6 +73,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         table.setDefaultEditor(Object.class, null);
         table.getTableHeader().setReorderingAllowed(false);
+        table.setBackground(Color.blue);
 
         filterList = new ArrayList<>();
 
@@ -110,23 +115,12 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         insertButton = new JButton("Insert");
         insertButton.addActionListener(this);
+
+        createTableButton = new JButton("Create Table");
+        createTableButton.addActionListener(this);
+        createTableButton.setBackground(Color.PINK);
+
         filters = new ArrayList<>();
-    }
-/*
-    public void refreshFilters(String tableName)throws Exception{
-        filterList = database.getColumns(tableName);
-        filterListPanel.add(filtersLabel);
-        for(String s : filterList){
-            JCheckBox check = new JCheckBox(s);
-            check.setFocusable(false);
-            filterListPanel.add(check);
-        }
-        this.validate();
-        this.repaint();
-    }
-*/
-    public void clearFilters(){
-        filterListPanel.removeAll();
     }
 
     public void loadTable(ResultSet rs) throws SQLException {
@@ -186,25 +180,19 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 qb.select("*");
                 qb.from((String) tablesComboBox.getSelectedItem());
                 loadTable(database.sendSelect(qb.build()));
-                clearFilters();
-                //refreshFilters(tablesComboBox.getSelectedItem().toString());
-                this.validate();
-                this.repaint();
             }
             if(e.getSource() == insertButton){
-
                 insertWindow = new InsertWindow(database);
-
             }
-
-
+            if(e.getSource() == createTableButton){
+                new CreateTableWindow();
+            }
         } catch(Exception ee){
             ee.printStackTrace();
         }
 
     }
 
-    ArrayList<Filter> filters;
     @Override
     public void mouseClicked(MouseEvent e) {
         if(e.getClickCount() == 1){
@@ -215,8 +203,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 SelectQueryBuilder qb = new SelectQueryBuilder();
                 qb.select("*");
                 qb.from("jobs");
-
-
 
                 boolean found = false;
                 if(!filters.isEmpty()) {
@@ -239,17 +225,14 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                     if(!found){
                         filters.add(new Filter(name, ASC));
                     }
-
                 }
                 else{
                     filters.add(new Filter(name, ASC));
                 }
 
-
                 if(!filters.isEmpty()) {
                     qb.orderBy(filters);
                 }
-
                 filterListPanel.add(filtersLabel);
                 for(Filter f : filters){
                     JLabel label = new JLabel(f.getFilterName() + " " + f.getFilterStatus());

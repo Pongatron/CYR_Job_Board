@@ -1,5 +1,6 @@
 package Main;
 
+import UI.InsertWindow;
 import UI.MainWindow;
 
 public class Main {

@@ -9,7 +9,6 @@ public class Filter {
     public Filter(String name, FilterStatus status){
         filterName = name;
         filterStatus = status;
-
     }
 
     public void setFilterStatus(FilterStatus filterStatus) {
