@@ -45,8 +45,6 @@ public class CreateTableWindow extends JFrame implements ActionListener {
         labelPanel.add(typeLabel);
         insideCenter.add(labelPanel);
 
-
-
         tableNamePanel.add(new JLabel("Table Name: "));
         tableNamePanel.add(tableNameField);
         topPanel.add(windowLabel, BorderLayout.NORTH);
@@ -59,14 +57,11 @@ public class CreateTableWindow extends JFrame implements ActionListener {
         centerPanel.add(scroll, BorderLayout.CENTER);
 
         this.add(topPanel, BorderLayout.NORTH);
-        //this.add(bottomPanel, BorderLayout.SOUTH);
-        //this.add(leftPanel, BorderLayout.WEST);
-        //this.add(rightPanel, BorderLayout.EAST);
         this.add(centerPanel, BorderLayout.CENTER);
 
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         this.setMinimumSize(new Dimension(400, 200));
-        //this.setPreferredSize(new Dimension(300,200));
+        this.setResizable(false);
         this.pack();
         this.setLocationRelativeTo(null);
         this.setVisible(true);
@@ -115,7 +110,6 @@ public class CreateTableWindow extends JFrame implements ActionListener {
         createButton.setMaximumSize(new Dimension(100,30));
 
         scroll = new JScrollPane(insideCenter);
-        //scroll.setPreferredSize(new Dimension(200, 200));
         scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
     }
 
@@ -146,16 +140,32 @@ public class CreateTableWindow extends JFrame implements ActionListener {
         insideCenter.repaint();
     }
 
+    public boolean verifyTable(){
+        if(tableNameField.getText().isEmpty() || tableNameField.getText().isBlank())
+            return false;
+        if(!panels.isEmpty()) {
+            for (JPanel p : panels) {
+                JTextField tx = (JTextField) p.getComponent(0);
+                JComboBox cb = (JComboBox) p.getComponent(1);
+                if (tx.getText().isEmpty() || tx.getText().isBlank() || cb.getSelectedItem().toString().equals("None")) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        else
+            return false;
+    }
+
     @Override
     public void actionPerformed(ActionEvent e) {
 
         if(e.getSource() == addButton){
             createRow();
-            //this.pack();
-            //repaint();
         }
         if(e.getSource() == removeButton){
-            removeRow();
+            if(!panels.isEmpty())
+                removeRow();
         }
         if(e.getSource() == createButton){
             ArrayList<String> colNames = new ArrayList<>();
@@ -187,13 +197,23 @@ public class CreateTableWindow extends JFrame implements ActionListener {
                 datatypes.add(parsedName);
             }
 
-            DatabaseInteraction interact = new DatabaseInteraction();
-            CreateTableQueryBuilder qb = new CreateTableQueryBuilder(colNames, datatypes);
-            qb.createTable(tableNameField.getText());
-            try {
-                interact.sendUpdate(qb.build());
-            } catch (Exception ex) {
-                ex.printStackTrace();
+            if(verifyTable()) {
+
+                int choice = JOptionPane.showConfirmDialog(null, "Are you sure you want to create a new Table?", null, JOptionPane.YES_NO_OPTION);
+
+                if(choice == JOptionPane.YES_OPTION) {
+                    DatabaseInteraction interact = new DatabaseInteraction();
+                    CreateTableQueryBuilder qb = new CreateTableQueryBuilder(colNames, datatypes);
+                    qb.createTable(tableNameField.getText());
+                    try {
+                        interact.sendUpdate(qb.build());
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+            else{
+                JOptionPane.showMessageDialog(null,"Invalid Table. Missing Parameters.");
             }
         }
 

@@ -1,6 +1,7 @@
 package UI;
 
 import DatabaseInteraction.*;
+import Table.TableCustom;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -17,8 +18,6 @@ import static DatabaseInteraction.Filter.FilterStatus.*;
 public class MainWindow extends JFrame implements ActionListener, MouseListener {
 
     private DatabaseInteraction database;
-    private JPanel leftPanel;
-    private JPanel rightPanel;
     private JPanel centerPanel;
     private JPanel topPanel;
     private JPanel filterListPanel;
@@ -35,7 +34,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
     private JTable table;
     private JComboBox tablesComboBox;
-    private ArrayList<String> filterList;
     private InsertWindow insertWindow;
     private ArrayList<Filter> filters;
 
@@ -46,20 +44,23 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         database = new DatabaseInteraction();
         initializeComponents();
 
+        SelectQueryBuilder qb = new SelectQueryBuilder();
+        qb.select("*");
+        qb.from("jobs");
+        loadTable(database.sendSelect(qb.build()));
+
         mainBar.add(tablesComboBox);
         mainBar.add(filterScroll);
         mainBar.add(insertButton);
         mainBar.add(createTableButton);
-        centerPanel.add(tableScroll);
+        centerPanel.add(tableScroll, BorderLayout.CENTER);
         filterListPanel.add(filtersLabel);
 
         this.add(mainBar, BorderLayout.NORTH);
         this.add(centerPanel, BorderLayout.CENTER);
-        this.add(leftPanel, BorderLayout.WEST);
-        this.add(rightPanel, BorderLayout.EAST);
 
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        this.setPreferredSize(new Dimension(1000, 600));
+        this.setPreferredSize(new Dimension(1000, 900));
         this.setMinimumSize(new Dimension(800, 100));
         this.pack();
         this.setLocationRelativeTo(null);
@@ -73,17 +74,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         table.setDefaultEditor(Object.class, null);
         table.getTableHeader().setReorderingAllowed(false);
-        table.setBackground(Color.blue);
-
-        filterList = new ArrayList<>();
-
-        leftPanel = new JPanel();
-        leftPanel.setBackground(Color.PINK);
-        leftPanel.setPreferredSize(new Dimension(20, 100));
-
-        rightPanel = new JPanel();
-        rightPanel.setBackground(Color.PINK);
-        rightPanel.setPreferredSize(new Dimension(20, 100));
 
         topPanel = new JPanel();
         topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.LINE_AXIS));
@@ -91,7 +81,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         centerPanel = new JPanel();
         centerPanel.setLayout(new BorderLayout());
-        centerPanel.setBackground(Color.GRAY);
+        centerPanel.setBorder(new EmptyBorder(5,5,5,5));
 
         filterListPanel = new JPanel();
         filterListPanel.setLayout(new BoxLayout(filterListPanel,BoxLayout.Y_AXIS));
@@ -142,33 +132,14 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         }
 
         table.setModel(tableModel);
-        modifyTable();
         for(int i = colCount; i < table.getColumnCount(); i++){
             TableColumn col = table.getColumnModel().getColumn(i);
             col.setPreferredWidth(30);
             col.setMaxWidth(30);
             col.setMinWidth(40);
         }
-    }
 
-    public void modifyTable(){
-
-        TableColumnModel columnModel = table.getColumnModel();
-        for (int column = 0; column < table.getColumnCount(); column++) {
-            int maxWidth = 0;
-
-            TableCellRenderer headerRenderer = table.getTableHeader().getDefaultRenderer();
-            Component headerComp = headerRenderer.getTableCellRendererComponent(table, table.getColumnName(column), false, false, -1, column);
-            maxWidth = Math.max(maxWidth, headerComp.getPreferredSize().width);
-            for (int row = 0; row < table.getRowCount(); row++) {
-                TableCellRenderer renderer = table.getCellRenderer(row, column);
-                Component comp = table.prepareRenderer(renderer, row, column);
-                maxWidth = Math.max(maxWidth, comp.getPreferredSize().width);
-            }
-            // Set the minimum width of the column
-            TableColumn tableColumn = columnModel.getColumn(column);
-            tableColumn.setMinWidth(maxWidth + 5); // 5 is for padding
-        }
+        TableCustom.apply(tableScroll, TableCustom.TableType.MULTI_LINE);
 
     }
 
@@ -176,13 +147,17 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     public void actionPerformed(ActionEvent e) {
         try{
             if(e.getSource() == tablesComboBox && !tablesComboBox.getSelectedItem().equals("[Select]")){
+                filters.clear();
+                filterListPanel.removeAll();
+                filterListPanel.repaint();
+                String selected = tablesComboBox.getSelectedItem().toString();
                 SelectQueryBuilder qb = new SelectQueryBuilder();
                 qb.select("*");
-                qb.from((String) tablesComboBox.getSelectedItem());
+                qb.from(selected);
                 loadTable(database.sendSelect(qb.build()));
             }
             if(e.getSource() == insertButton){
-                insertWindow = new InsertWindow(database);
+                insertWindow = new InsertWindow(database, tablesComboBox.getSelectedItem().toString());
             }
             if(e.getSource() == createTableButton){
                 new CreateTableWindow();
@@ -202,7 +177,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 String name = table.getColumnName(col);
                 SelectQueryBuilder qb = new SelectQueryBuilder();
                 qb.select("*");
-                qb.from("jobs");
+                qb.from(tablesComboBox.getSelectedItem().toString());
 
                 boolean found = false;
                 if(!filters.isEmpty()) {

@@ -1,7 +1,4 @@
-package Main;
-
-import UI.InsertWindow;
-import UI.MainWindow;
+package UI;
 
 public class Main {
 
