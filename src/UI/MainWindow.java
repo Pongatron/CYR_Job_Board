@@ -6,6 +6,8 @@ import Table.TableCustom;
 
 import javax.swing.*;
 import javax.swing.border.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -13,6 +15,9 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -51,11 +56,17 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JButton customerFilterButton;
     private JButton dateFilterButton;
 
+    JSplitPane splitPane;
+    JPanel rightPanel;
+    private int totalWidth;
+    private JTable datesTable;
+    private JScrollPane datesScroll;
 
     public MainWindow() throws Exception{
 
         database = new DatabaseInteraction();
         initializeComponents();
+        syncScrollPanes();
 
         SelectQueryBuilder qb = new SelectQueryBuilder();
         qb.select("*");
@@ -79,14 +90,17 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         mainBar.add(topContainerPanel);
 
 
+        centerPanel.setPreferredSize(new Dimension(totalWidth, 200));
+
         centerPanel.add(tableScroll, BorderLayout.CENTER);
 
+
         this.add(mainBar, BorderLayout.NORTH);
-        this.add(centerPanel, BorderLayout.CENTER);
+        this.add(splitPane, BorderLayout.CENTER);
 
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setTitle("Job Board");
-        this.setPreferredSize(new Dimension(1000, 900));
+        this.setPreferredSize(new Dimension(1440, 900));
         this.setMinimumSize(new Dimension(800, 100));
         this.setBackground(new Color(24,24,24));
         this.pack();
@@ -103,6 +117,14 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setBackground(new Color(24,24,24));
 
+        datesTable = new JTable();
+        datesTable.getTableHeader().addMouseListener(this);
+        datesTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        datesTable.setDefaultEditor(Object.class, null);
+        datesTable.getTableHeader().setReorderingAllowed(false);
+        datesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        datesTable.setBackground(new Color(24,24,24));
+
         topPanel = new JPanel();
         topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.X_AXIS));
         topPanel.setBackground(new Color(24,24,24));
@@ -111,8 +133,12 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         centerPanel = new JPanel();
         centerPanel.setLayout(new BorderLayout());
-        centerPanel.setBorder(new EmptyBorder(5,5,5,5));
+        //centerPanel.setBorder(new EmptyBorder(5,5,5,5));
         centerPanel.setBackground(new Color(24,24,24));
+
+        rightPanel = new JPanel();
+
+
 
         buttonPanel = new JPanel();
         buttonPanel.setLayout(new GridLayout(2,3, 10,10));
@@ -126,7 +152,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         addJobButton.setFont(BOLD_FONT);
         addJobButton.setFocusable(false);
         addJobButton.addActionListener(this);
-
 
         updateJobButton = new JButton("Update");
         updateJobButton.setBackground(new Color(0, 52, 191));
@@ -176,12 +201,19 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         filterScroll.setMaximumSize(new Dimension(200, 100));
 
         tableScroll = new JScrollPane(table);
-        tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        tableScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+        tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        tableScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         tableScroll.setPreferredSize(new Dimension(500,0));
         tableScroll.getViewport().setBackground(new Color(24,24,24));
         tableScroll.getVerticalScrollBar().setBackground(new Color(24,24,24));
         tableScroll.getHorizontalScrollBar().setBackground(new Color(24,24,24));
+
+        datesScroll = new JScrollPane(datesTable);
+        datesScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        datesScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+        datesScroll.getViewport().setBackground(new Color(24,24,24));
+        datesScroll.getVerticalScrollBar().setBackground(new Color(24,24,24));
+        datesScroll.getHorizontalScrollBar().setBackground(new Color(24,24,24));
 
         tablesComboBox = new JComboBox(database.getTables());
         tablesComboBox.addActionListener(this);
@@ -195,34 +227,51 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         createTableButton.setBackground(Color.PINK);
 
         filters = new ArrayList<>();
-
+        splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, centerPanel,datesScroll);
         TableCustom.apply(tableScroll, TableCustom.TableType.DEFAULT);
+        TableCustom.apply(datesScroll, TableCustom.TableType.DEFAULT);
+    }
+
+    public void syncScrollPanes() {
+        JScrollBar vScroll1 = tableScroll.getVerticalScrollBar();
+        JScrollBar vScroll2 = datesScroll.getVerticalScrollBar();
+
+        vScroll1.getModel().addChangeListener(new ChangeListener() {
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                vScroll2.setValue(vScroll1.getValue());
+            }
+        });
+        vScroll2.getModel().addChangeListener(new ChangeListener() {
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                vScroll1.setValue(vScroll2.getValue());
+            }
+        });
+
     }
 
     public void loadTable(ResultSet rs) throws SQLException {
 
         ResultSetMetaData rsMeta = rs.getMetaData();
         DefaultTableModel tableModel = new DefaultTableModel();
+        DefaultTableModel dateTableModel = new DefaultTableModel();
         int colCount = rsMeta.getColumnCount();
 
         for (int i = 1; i <= colCount; i++) {
             tableModel.addColumn(rsMeta.getColumnLabel(i));
         }
 
-        SimpleDateFormat dateFormat = new SimpleDateFormat("E-dd-MMM");
-        Calendar calendar = Calendar.getInstance();
-
-
-        for (int i = 0; i < 365; i++) {
-            Date date = calendar.getTime();
-            int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
-            if(dayOfWeek != Calendar.SATURDAY && dayOfWeek != Calendar.SUNDAY) {
-                String day = dateFormat.format(date);
-                tableModel.addColumn(day);
-            }
-            calendar.add(Calendar.DAY_OF_YEAR, 1);
+        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E-dd-MMM");
+        LocalDate today = LocalDate.now();
+        LocalDate ninetyDaysAgo = today.minusDays(90);
+        LocalDate oneYearFromNow = today.plusDays(365);
+        LocalDate currentDate = ninetyDaysAgo;
+        while(!currentDate.isAfter(oneYearFromNow)){
+            dateTableModel.addColumn(currentDate.format(dateFormat));
+            currentDate = currentDate.plusDays(1);
         }
-
+        datesTable.setModel(dateTableModel);
         Object[] row = new Object[colCount];
         while (rs.next()) {
             for (int i = 0; i < colCount; i++) {
@@ -232,7 +281,9 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         }
         table.setModel(tableModel);
         table.getTableHeader().setFont(new Font(table.getTableHeader().getFont().getFontName(), Font.BOLD, table.getTableHeader().getFont().getSize()));
+        datesTable.getTableHeader().setFont(new Font(table.getTableHeader().getFont().getFontName(), Font.BOLD, table.getTableHeader().getFont().getSize()));
 
+        totalWidth = 0;
         FontMetrics fontMetrics = table.getFontMetrics(table.getFont());
         for(int col = 0; col < colCount; col++){
             int maxWidth = 0;
@@ -247,19 +298,24 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 maxWidth = Math.max(maxWidth, cellWidth);
             }
             table.getColumnModel().getColumn(col).setPreferredWidth(maxWidth+25);
+            totalWidth += maxWidth+25;
         }
 
 
-        TableCellRenderer headerRenderer = new RotatedHeaderRenderer(table);
-        for (int i = colCount; i < table.getColumnModel().getColumnCount(); i++) {
-            table.getColumnModel().getColumn(i).setHeaderRenderer(headerRenderer);
-            table.getColumnModel().getColumn(i).setMinWidth(30);
-            table.getColumnModel().getColumn(i).setMaxWidth(30);
-            table.getColumnModel().getColumn(i).setPreferredWidth(30);
+        TableCellRenderer headerRenderer = new RotatedHeaderRenderer(datesTable);
+        for (int i = 0; i < datesTable.getColumnModel().getColumnCount(); i++) {
+            datesTable.getColumnModel().getColumn(i).setHeaderRenderer(headerRenderer);
+            datesTable.getColumnModel().getColumn(i).setMinWidth(30);
+            datesTable.getColumnModel().getColumn(i).setMaxWidth(30);
+            datesTable.getColumnModel().getColumn(i).setPreferredWidth(30);
         }
 
+
+        datesTable.scrollRectToVisible(datesTable.getCellRect(0, 90, true));
         table.getTableHeader().setPreferredSize(new Dimension(table.getTableHeader().getPreferredSize().width, 100));
+        datesTable.getTableHeader().setPreferredSize(new Dimension(table.getTableHeader().getPreferredSize().width, 100));
     }
+
 
     @Override
     public void actionPerformed(ActionEvent e) {
