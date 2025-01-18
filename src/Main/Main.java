@@ -1,4 +1,6 @@
-package UI;
+package Main;
+
+import UI.MainWindow;
 
 public class Main {
 

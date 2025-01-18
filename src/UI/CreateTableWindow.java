@@ -204,7 +204,7 @@ public class CreateTableWindow extends JFrame implements ActionListener {
                 if(choice == JOptionPane.YES_OPTION) {
                     DatabaseInteraction interact = new DatabaseInteraction();
                     CreateTableQueryBuilder qb = new CreateTableQueryBuilder(colNames, datatypes);
-                    qb.createTable(tableNameField.getText());
+                    qb.nameTable(tableNameField.getText());
                     try {
                         interact.sendUpdate(qb.build());
                     } catch (Exception ex) {

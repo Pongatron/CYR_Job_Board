@@ -12,6 +12,9 @@ public class TextAreaCellRenderer extends JTextArea implements TableCellRenderer
 
     private final List<List<Integer>> rowAndCellHeights = new ArrayList<>();
     private HoverIndex hoverRow;
+    private static Color HOVER_COLOR = new Color(18,18,18);
+    private static Color ROW1_COLOR = new Color(40,40,40);
+    private static Color ROW2_COLOR = new Color(64,64,64);
 
     public TextAreaCellRenderer(HoverIndex hoverRow){
         this.hoverRow = hoverRow;
@@ -30,14 +33,17 @@ public class TextAreaCellRenderer extends JTextArea implements TableCellRenderer
         }
         else{
             if(row == hoverRow.getIndex()){
-                setBackground(new Color(230,230,230));
+                setBackground(HOVER_COLOR);
+                setForeground(Color.white);
             }
             else{
                 if(row % 2 == 0){
-                    setBackground(Color.WHITE);
+                    setBackground(ROW1_COLOR);
+                    setForeground(Color.white);
                 }
                 else{
-                    setBackground(new Color(242,242,242));
+                    setBackground(ROW2_COLOR);
+                    setForeground(Color.white);
                 }
             }
         }

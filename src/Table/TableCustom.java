@@ -10,10 +10,16 @@ import java.awt.event.MouseMotionAdapter;
 
 public class TableCustom {
 
-    public static enum TableType {MULTI_LINE, DEFAULT}
+    public static enum TableType {MULTI_LINE, DEFAULT, VERTICAL}
+
+    public static final Color GRIDLINE_COLOR = new Color(70,70,70);
+    public static final Color HEADERTEXT_COLOR = new Color(255,255,255);
+    public static final Color HEADERCELL_COLOR = new Color(50,50,50);
+    public static final Color SELECTION_COLOR = new Color(213, 240, 242);
 
     public static void apply(JScrollPane scroll, TableType type){
         JTable table = (JTable) scroll.getViewport().getComponent(0);
+        table.setSelectionBackground(SELECTION_COLOR);
         table.setFont(new Font("SansSerif", Font.PLAIN, 12));
         table.getTableHeader().setReorderingAllowed(false);
         table.getTableHeader().setDefaultRenderer(new TableHeaderCustomCellRenderer(table));
@@ -21,6 +27,9 @@ public class TableCustom {
         HoverIndex hoverRow = new HoverIndex();
         TableCellRenderer cellRender;
         if(type == TableType.DEFAULT){
+            cellRender = new TableCustomCellRenderer(hoverRow);
+        }
+        else if(type == TableType.VERTICAL){
             cellRender = new TableCustomCellRenderer(hoverRow);
         }
         else{
@@ -31,23 +40,22 @@ public class TableCustom {
         table.setDefaultRenderer(Boolean.class, new BooleanCellRenderer(hoverRow));
 
         table.setShowVerticalLines(true);
-        table.setGridColor(new Color(220,220,220));
-        table.setForeground(new Color(51,51,51));
-        table.setSelectionForeground(new Color(51,51,51));
-        scroll.setBorder(new LineBorder(new Color(220,220,220)));
+        table.setGridColor(GRIDLINE_COLOR);
+        table.setForeground(HEADERTEXT_COLOR);
+        table.setSelectionForeground(HEADERTEXT_COLOR);
+        scroll.setBorder(new LineBorder(GRIDLINE_COLOR));
 
         JPanel panel = new JPanel(){
             @Override
             public void paint(Graphics g){
                 super.paint(g);
-                g.setColor(new Color(220,220,220));
+                g.setColor(GRIDLINE_COLOR);
                 g.drawLine(0, getHeight() - 1, getWidth(), getHeight() - 1);
             }
         };
-        panel.setBackground(new Color(250,250,250));
+        panel.setBackground(HEADERCELL_COLOR);
         scroll.setCorner(JScrollPane.UPPER_RIGHT_CORNER, panel);
-        scroll.getViewport().setBackground(Color.WHITE);
-        table.getTableHeader().setBackground(new Color(250,250,250));
+        table.getTableHeader().setBackground(HEADERCELL_COLOR);
         table.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseExited(MouseEvent e) {

@@ -13,7 +13,7 @@ public class CreateTableQueryBuilder {
 
     }
 
-    public void createTable(String tableName){
+    public void nameTable(String tableName){
         this.tableName = tableName;
     }
 

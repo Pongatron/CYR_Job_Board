@@ -60,16 +60,12 @@ public class DatabaseInteraction {
         rs = sendSelect(tableNameQuery);
         rsMeta = rs.getMetaData();
         String[] colNameList = new String[tableCount+1];
-        colNameList[0] = "[Select]";
-        int i = 1;
+        int i = 0;
         while(rs.next()){
             String str = rs.getString("table_name");
-//            System.out.println(str);
             colNameList[i] = str;
             i++;
         }
-//        for(String s : colNameList)
-//            System.out.print(s);
 
         return colNameList;
     }
