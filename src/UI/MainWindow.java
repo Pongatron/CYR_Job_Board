@@ -28,39 +28,25 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
     private static final Font PLAIN_FONT = new Font("SansSerif", Font.PLAIN, 12);
     private static final Font BOLD_FONT = new Font("SansSerif", Font.BOLD, 12);
-
     private DatabaseInteraction database;
     private JPanel centerPanel;
     private JPanel topPanel;
-    private JPanel filterListPanel;
-
-    private JButton insertButton;
-    private JButton createTableButton;
-    private JToolBar mainBar;
-    private JScrollPane filterScroll;
-    private JScrollPane tableScroll;
-
-    private JLabel filtersLabel = new JLabel("Filters:");
-
-    private JTable table;
-    private JComboBox tablesComboBox;
-    private InsertWindow insertWindow;
-    private ArrayList<Filter> filters;
-
-
+    private JPanel buttonPanel;
     private JButton addJobButton;
     private JButton updateJobButton;
     private JButton deleteButton;
-    private JPanel buttonPanel;
     private JButton jwoFilterButton;
     private JButton customerFilterButton;
     private JButton dateFilterButton;
-
-    JSplitPane splitPane;
-    JPanel rightPanel;
-    private int totalWidth;
-    private JTable datesTable;
+    private JButton todayButton;
+    private JButton resetViewButton;
+    private JScrollPane tableScroll;
     private JScrollPane datesScroll;
+    private JTable table;
+    private JTable datesTable;
+    private JSplitPane splitPane;
+    private JToolBar mainBar;
+    private int totalWidth;
 
     public MainWindow() throws Exception{
 
@@ -73,7 +59,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         qb.from("job_board");
         loadTable(database.sendSelect(qb.build()));
 
-
         buttonPanel.add(addJobButton);
         buttonPanel.add(updateJobButton);
         buttonPanel.add(deleteButton);
@@ -84,16 +69,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         JPanel topContainerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         topContainerPanel.setBackground(new Color(24,24,24));
         topContainerPanel.add(buttonPanel);
-        topContainerPanel.add(tablesComboBox);
+        topContainerPanel.add(resetViewButton);
+        topContainerPanel.add(todayButton);
 
-        // Add this topContainerPanel to the mainBar (or directly to the frame if preferred)
         mainBar.add(topContainerPanel);
 
-
         centerPanel.setPreferredSize(new Dimension(totalWidth, 200));
-
         centerPanel.add(tableScroll, BorderLayout.CENTER);
-
 
         this.add(mainBar, BorderLayout.NORTH);
         this.add(splitPane, BorderLayout.CENTER);
@@ -133,12 +115,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         centerPanel = new JPanel();
         centerPanel.setLayout(new BorderLayout());
-        //centerPanel.setBorder(new EmptyBorder(5,5,5,5));
         centerPanel.setBackground(new Color(24,24,24));
-
-        rightPanel = new JPanel();
-
-
 
         buttonPanel = new JPanel();
         buttonPanel.setLayout(new GridLayout(2,3, 10,10));
@@ -188,17 +165,24 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         dateFilterButton.setFocusable(false);
         dateFilterButton.addActionListener(this);
 
-        filterListPanel = new JPanel();
-        filterListPanel.setLayout(new BoxLayout(filterListPanel,BoxLayout.Y_AXIS));
+        todayButton = new JButton("Today");
+        todayButton.setBackground(new Color(0, 0, 0));
+        todayButton.setForeground(new Color(255,255,255));
+        todayButton.setFont(BOLD_FONT);
+        todayButton.setFocusable(false);
+        todayButton.addActionListener(this);
+
+        resetViewButton = new JButton("Reset View");
+        resetViewButton.setBackground(new Color(0, 0, 0));
+        resetViewButton.setForeground(new Color(255,255,255));
+        resetViewButton.setFont(BOLD_FONT);
+        resetViewButton.setFocusable(false);
+        resetViewButton.addActionListener(this);
 
         mainBar = new JToolBar();
         mainBar.setFloatable(false);
         mainBar.setPreferredSize(new Dimension(0, 100));
         mainBar.setBackground(new Color(24,24,24));
-
-        filterScroll = new JScrollPane(filterListPanel);
-        filterScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        filterScroll.setMaximumSize(new Dimension(200, 100));
 
         tableScroll = new JScrollPane(table);
         tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
@@ -215,19 +199,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         datesScroll.getVerticalScrollBar().setBackground(new Color(24,24,24));
         datesScroll.getHorizontalScrollBar().setBackground(new Color(24,24,24));
 
-        tablesComboBox = new JComboBox(database.getTables());
-        tablesComboBox.addActionListener(this);
-        tablesComboBox.setMaximumSize(tablesComboBox.getPreferredSize());
-
-        insertButton = new JButton("Insert");
-        insertButton.addActionListener(this);
-
-        createTableButton = new JButton("Create Table");
-        createTableButton.addActionListener(this);
-        createTableButton.setBackground(Color.PINK);
-
-        filters = new ArrayList<>();
         splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, centerPanel,datesScroll);
+
         TableCustom.apply(tableScroll, TableCustom.TableType.DEFAULT);
         TableCustom.apply(datesScroll, TableCustom.TableType.DEFAULT);
     }
@@ -248,7 +221,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 vScroll1.setValue(vScroll2.getValue());
             }
         });
-
     }
 
     public void loadTable(ResultSet rs) throws SQLException {
@@ -271,15 +243,18 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             dateTableModel.addColumn(currentDate.format(dateFormat));
             currentDate = currentDate.plusDays(1);
         }
-        datesTable.setModel(dateTableModel);
+
         Object[] row = new Object[colCount];
+        Object[] emptyRow = new Object[colCount];
         while (rs.next()) {
             for (int i = 0; i < colCount; i++) {
                 row[i] = rs.getObject(i + 1);
             }
             tableModel.addRow(row);
+            dateTableModel.addRow(emptyRow);
         }
         table.setModel(tableModel);
+        datesTable.setModel(dateTableModel);
         table.getTableHeader().setFont(new Font(table.getTableHeader().getFont().getFontName(), Font.BOLD, table.getTableHeader().getFont().getSize()));
         datesTable.getTableHeader().setFont(new Font(table.getTableHeader().getFont().getFontName(), Font.BOLD, table.getTableHeader().getFont().getSize()));
 
@@ -287,10 +262,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         FontMetrics fontMetrics = table.getFontMetrics(table.getFont());
         for(int col = 0; col < colCount; col++){
             int maxWidth = 0;
-
             int headerWidth = fontMetrics.stringWidth(tableModel.getColumnName(col));
             maxWidth = headerWidth;
-
             for(int i = 0; i < table.getRowCount(); i++){
                 TableCellRenderer cellRenderer = table.getCellRenderer(i, col);
                 Component comp = table.prepareRenderer(cellRenderer, i, col);
@@ -301,7 +274,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             totalWidth += maxWidth+25;
         }
 
-
         TableCellRenderer headerRenderer = new RotatedHeaderRenderer(datesTable);
         for (int i = 0; i < datesTable.getColumnModel().getColumnCount(); i++) {
             datesTable.getColumnModel().getColumn(i).setHeaderRenderer(headerRenderer);
@@ -310,8 +282,12 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             datesTable.getColumnModel().getColumn(i).setPreferredWidth(30);
         }
 
+        int targetColumn = 90;
+        Rectangle cellRect = datesTable.getCellRect(0, targetColumn, true);
+        JScrollBar hScrollBar = datesScroll.getHorizontalScrollBar();
+        hScrollBar.setValue(cellRect.x);
+        datesTable.scrollRectToVisible(cellRect);
 
-        datesTable.scrollRectToVisible(datesTable.getCellRect(0, 90, true));
         table.getTableHeader().setPreferredSize(new Dimension(table.getTableHeader().getPreferredSize().width, 100));
         datesTable.getTableHeader().setPreferredSize(new Dimension(table.getTableHeader().getPreferredSize().width, 100));
     }
@@ -333,13 +309,41 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         }
         if(e.getSource() == jwoFilterButton){
-
+            SelectQueryBuilder qb = new SelectQueryBuilder();
+            qb.select("*");
+            qb.from("job_board");
+            Filter f = new Filter("jwo", DESC);
+            qb.orderBy(f);
+            try {
+                loadTable(database.sendSelect(qb.build()));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
         if(e.getSource() == customerFilterButton){
-
+            SelectQueryBuilder qb = new SelectQueryBuilder();
+            qb.select("*");
+            qb.from("job_board");
+            Filter f = new Filter("customer", ASC);
+            qb.orderBy(f);
+            try {
+                loadTable(database.sendSelect(qb.build()));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
         if(e.getSource() == dateFilterButton){
 
+        }
+        if(e.getSource() == todayButton) {
+            int targetColumn = 90;
+            Rectangle cellRect = datesTable.getCellRect(0, targetColumn, true);
+            JScrollBar hScrollBar = datesScroll.getHorizontalScrollBar();
+            hScrollBar.setValue(cellRect.x);
+            datesTable.scrollRectToVisible(cellRect);
+        }
+        if(e.getSource() == resetViewButton) {
+            splitPane.setDividerLocation(centerPanel.getPreferredSize().width);
         }
     }
 

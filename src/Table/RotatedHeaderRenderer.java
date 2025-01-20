@@ -48,7 +48,5 @@ public class RotatedHeaderRenderer extends DefaultTableCellRenderer {
         FontMetrics fm = g2d.getFontMetrics();
         int stringWidth = fm.stringWidth(truncatedText);
         g2d.drawString(truncatedText, (width - stringWidth) / 2, height / 2);
-
-
     }
 }

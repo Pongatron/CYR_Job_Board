@@ -23,9 +23,7 @@ public class InsertQueryBuilder {
     public String build(){
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT INTO ");
-
         sb.append(table);
-
         sb.append(" VALUES ('");
         for(int i = 0; i < values.size(); i++){
             sb.append(values.get(i));

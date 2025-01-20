@@ -32,8 +32,8 @@ public class SelectQueryBuilder {
         }
     }
 
-    public void orderBy(ArrayList<Filter> filters){
-        for(Filter f : filters){
+    public void orderBy(Filter ... filter){
+        for(Filter f : filter){
             this.filters.add(f);
         }
     }

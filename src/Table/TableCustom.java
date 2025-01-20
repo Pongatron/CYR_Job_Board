@@ -10,7 +10,7 @@ import java.awt.event.MouseMotionAdapter;
 
 public class TableCustom {
 
-    public static enum TableType {MULTI_LINE, DEFAULT, VERTICAL}
+    public enum TableType {MULTI_LINE, DEFAULT, VERTICAL}
 
     public static final Color GRIDLINE_COLOR = new Color(70,70,70);
     public static final Color HEADERTEXT_COLOR = new Color(255,255,255);
@@ -72,7 +72,6 @@ public class TableCustom {
                     table.repaint();
                 }
             }
-
             @Override
             public void mouseDragged(MouseEvent e) {
                 int row = table.rowAtPoint(e.getPoint());
@@ -82,7 +81,6 @@ public class TableCustom {
                 }
             }
         });
-
         adjustColumnWidths(table);
     }
 
@@ -100,7 +98,6 @@ public class TableCustom {
     private static int getMaxColumnWidth(JTable table, int col) {
 
         int maxWidth = 0;
-
         TableCellRenderer headerRenderer = table.getTableHeader().getDefaultRenderer();
         Component headerComponent = headerRenderer.getTableCellRendererComponent(table, table.getColumnModel().getColumn(col).getHeaderValue(), false,false, 0, col);
         maxWidth = Math.max(maxWidth, headerComponent.getPreferredSize().width);
@@ -112,5 +109,4 @@ public class TableCustom {
         }
         return maxWidth;
     }
-
 }

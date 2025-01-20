@@ -21,12 +21,10 @@ public class InsertWindow extends JFrame implements ActionListener {
     DatabaseInteraction database;
     String[] requiredValues;
     ArrayList<JPanel> fields;
-
     JPanel centerPanel;
     JPanel fieldsPanel;
     JButton createButton;
     JButton resetButton;
-
 
     public InsertWindow(DatabaseInteraction database)throws Exception{
         this.database = database;
@@ -93,16 +91,12 @@ public class InsertWindow extends JFrame implements ActionListener {
             fields.add(panel);
             fieldsPanel.add(panel);
         }
-
     }
-
-
 
     public void populateRequiredFields(){
         String file = "src\\requiredFields.txt";
         BufferedReader reader = null;
         String line = "";
-
         try{
             reader = new BufferedReader(new FileReader(file));
             while((line = reader.readLine()) != null){
@@ -122,7 +116,6 @@ public class InsertWindow extends JFrame implements ActionListener {
                 throw new RuntimeException(e);
             }
         }
-
     }
 
     private boolean verifyRequiredFields() {
@@ -136,7 +129,6 @@ public class InsertWindow extends JFrame implements ActionListener {
                     JOptionPane.showMessageDialog(null, "Missing field: "+s, null, JOptionPane.INFORMATION_MESSAGE);
                     return false;
                 }
-
             }
         }
         return true;
@@ -146,8 +138,6 @@ public class InsertWindow extends JFrame implements ActionListener {
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == createButton){
             if(verifyRequiredFields()){
-                System.out.println("good");
-
                 InsertQueryBuilder qb = new InsertQueryBuilder();
                 qb.insertInto("job_board");
                 for(JPanel p : fields){
@@ -156,14 +146,12 @@ public class InsertWindow extends JFrame implements ActionListener {
                     if(!str.isBlank())
                         qb.values(str);
                 }
-
                 try {
                     database.sendUpdate(qb.build());
                 } catch (Exception ex) {
                     throw new RuntimeException(ex);
                 }
             }
-
         }
         if(e.getSource() == resetButton){
             for(JPanel p : fields){
@@ -172,6 +160,4 @@ public class InsertWindow extends JFrame implements ActionListener {
             }
         }
     }
-
-
 }

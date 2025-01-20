@@ -10,5 +10,4 @@ public class HoverIndex {
     public void setIndex(int index){
         this.index = index;
     }
-
 }
