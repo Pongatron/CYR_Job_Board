@@ -15,12 +15,14 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.TimerTask;
 
 import static DatabaseInteraction.Filter.FilterStatus.*;
 
@@ -47,6 +49,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JSplitPane splitPane;
     private JToolBar mainBar;
     private int totalWidth;
+    private int todayCol = -1;
 
     public MainWindow() throws Exception{
 
@@ -76,6 +79,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         centerPanel.setPreferredSize(new Dimension(totalWidth, 200));
         centerPanel.add(tableScroll, BorderLayout.CENTER);
+        splitPane.setDividerLocation(centerPanel.getPreferredSize().width);
 
         this.add(mainBar, BorderLayout.NORTH);
         this.add(splitPane, BorderLayout.CENTER);
@@ -202,7 +206,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, centerPanel,datesScroll);
 
         TableCustom.apply(tableScroll, TableCustom.TableType.DEFAULT);
-        TableCustom.apply(datesScroll, TableCustom.TableType.DEFAULT);
+        TableCustom.apply(datesScroll, TableCustom.TableType.VERTICAL);
     }
 
     public void syncScrollPanes() {
@@ -224,7 +228,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     }
 
     public void loadTable(ResultSet rs) throws SQLException {
-
         ResultSetMetaData rsMeta = rs.getMetaData();
         DefaultTableModel tableModel = new DefaultTableModel();
         DefaultTableModel dateTableModel = new DefaultTableModel();
@@ -234,15 +237,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             tableModel.addColumn(rsMeta.getColumnLabel(i));
         }
 
-        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E-dd-MMM");
-        LocalDate today = LocalDate.now();
-        LocalDate ninetyDaysAgo = today.minusDays(90);
-        LocalDate oneYearFromNow = today.plusDays(365);
-        LocalDate currentDate = ninetyDaysAgo;
-        while(!currentDate.isAfter(oneYearFromNow)){
-            dateTableModel.addColumn(currentDate.format(dateFormat));
-            currentDate = currentDate.plusDays(1);
-        }
+
 
         Object[] row = new Object[colCount];
         Object[] emptyRow = new Object[colCount];
@@ -254,7 +249,38 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             dateTableModel.addRow(emptyRow);
         }
         table.setModel(tableModel);
+
+        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E-dd-MMM");
+        LocalDate today = LocalDate.now();
+        LocalDate ninetyDaysAgo = today.minusDays(90);
+        LocalDate oneYearFromNow = today.plusDays(365);
+        LocalDate currentDate = ninetyDaysAgo;
+        ArrayList<LocalDate> saturdayList = new ArrayList<>();
+        for(int i = 0; i < table.getRowCount(); i++){
+            java.sql.Date sqlDate = (java.sql.Date) table.getValueAt(i,6);
+            LocalDate date = sqlDate.toLocalDate();
+            if(date.getDayOfWeek() == DayOfWeek.SATURDAY) {
+                saturdayList.add(date);
+            }
+        }
+        while(!currentDate.isAfter(oneYearFromNow)){
+            if(currentDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                if(currentDate.getDayOfWeek() == DayOfWeek.SATURDAY) {
+                    for(LocalDate d : saturdayList){
+                        if(d.equals(currentDate)) {
+                            dateTableModel.addColumn(currentDate.format(dateFormat));
+                        }
+                    }
+                }
+                else
+                    dateTableModel.addColumn(currentDate.format(dateFormat));
+                if (currentDate.equals(today))
+                    todayCol = dateTableModel.getColumnCount() - 1;
+            }
+            currentDate = currentDate.plusDays(1);
+        }
         datesTable.setModel(dateTableModel);
+
         table.getTableHeader().setFont(new Font(table.getTableHeader().getFont().getFontName(), Font.BOLD, table.getTableHeader().getFont().getSize()));
         datesTable.getTableHeader().setFont(new Font(table.getTableHeader().getFont().getFontName(), Font.BOLD, table.getTableHeader().getFont().getSize()));
 
@@ -274,36 +300,40 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             totalWidth += maxWidth+25;
         }
 
-        TableCellRenderer headerRenderer = new RotatedHeaderRenderer(datesTable);
+        datesTable.getTableHeader().setDefaultRenderer(new RotatedHeaderRenderer(datesTable));
         for (int i = 0; i < datesTable.getColumnModel().getColumnCount(); i++) {
-            datesTable.getColumnModel().getColumn(i).setHeaderRenderer(headerRenderer);
             datesTable.getColumnModel().getColumn(i).setMinWidth(30);
             datesTable.getColumnModel().getColumn(i).setMaxWidth(30);
             datesTable.getColumnModel().getColumn(i).setPreferredWidth(30);
         }
 
-        int targetColumn = 90;
-        Rectangle cellRect = datesTable.getCellRect(0, targetColumn, true);
-        JScrollBar hScrollBar = datesScroll.getHorizontalScrollBar();
-        hScrollBar.setValue(cellRect.x);
-        datesTable.scrollRectToVisible(cellRect);
+        if(todayCol != 1) {
+            Rectangle cellRect = datesTable.getCellRect(0, todayCol, true);
+            JScrollBar hScrollBar = datesScroll.getHorizontalScrollBar();
+            hScrollBar.setValue(cellRect.x);
+            datesTable.scrollRectToVisible(cellRect);
+        }
 
         table.getTableHeader().setPreferredSize(new Dimension(table.getTableHeader().getPreferredSize().width, 100));
         datesTable.getTableHeader().setPreferredSize(new Dimension(table.getTableHeader().getPreferredSize().width, 100));
-    }
 
+        database.closeResources();
+    }
 
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == addJobButton){
-            try {
-                new InsertWindow(database);
-            }catch (Exception ex){
-                ex.printStackTrace();
-            }
+                new InsertWindow();
         }
         if(e.getSource() == updateJobButton){
-
+            SelectQueryBuilder qb = new SelectQueryBuilder();
+            qb.select("*");
+            qb.from("job_board");
+            try {
+                loadTable(database.sendSelect(qb.build()));
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
         }
         if(e.getSource() == deleteButton){
 
@@ -333,14 +363,24 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             }
         }
         if(e.getSource() == dateFilterButton){
-
+            SelectQueryBuilder qb = new SelectQueryBuilder();
+            qb.select("*");
+            qb.from("job_board");
+            Filter f = new Filter("due_date", DESC);
+            qb.orderBy(f);
+            try {
+                loadTable(database.sendSelect(qb.build()));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
         if(e.getSource() == todayButton) {
-            int targetColumn = 90;
-            Rectangle cellRect = datesTable.getCellRect(0, targetColumn, true);
-            JScrollBar hScrollBar = datesScroll.getHorizontalScrollBar();
-            hScrollBar.setValue(cellRect.x);
-            datesTable.scrollRectToVisible(cellRect);
+            if(todayCol != 1) {
+                Rectangle cellRect = datesTable.getCellRect(0, todayCol, true);
+                JScrollBar hScrollBar = datesScroll.getHorizontalScrollBar();
+                hScrollBar.setValue(cellRect.x);
+                datesTable.scrollRectToVisible(cellRect);
+            }
         }
         if(e.getSource() == resetViewButton) {
             splitPane.setDividerLocation(centerPanel.getPreferredSize().width);

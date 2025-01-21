@@ -30,7 +30,7 @@ public class TableCustom {
             cellRender = new TableCustomCellRenderer(hoverRow);
         }
         else if(type == TableType.VERTICAL){
-            cellRender = new TableCustomCellRenderer(hoverRow);
+            cellRender = new DateTableCustomCellRenderer(hoverRow);
         }
         else{
             cellRender = new TextAreaCellRenderer(hoverRow);

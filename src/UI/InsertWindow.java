@@ -11,6 +11,7 @@ import java.awt.event.ActionListener;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.sql.ResultSet;
@@ -26,9 +27,8 @@ public class InsertWindow extends JFrame implements ActionListener {
     JButton createButton;
     JButton resetButton;
 
-    public InsertWindow(DatabaseInteraction database)throws Exception{
-        this.database = database;
-        populateRequiredFields();
+    public InsertWindow(){
+        database = new DatabaseInteraction();
         initializeComponents();
         addFields();
 
@@ -39,7 +39,7 @@ public class InsertWindow extends JFrame implements ActionListener {
         this.add(centerPanel);
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         this.setTitle("Add Job");
-        this.setPreferredSize(new Dimension(400, 550));
+        this.setPreferredSize(new Dimension(500, 850));
         this.setBackground(new Color(24,24,24));
         this.pack();
         this.setLocationRelativeTo(null);
@@ -69,88 +69,62 @@ public class InsertWindow extends JFrame implements ActionListener {
         fields = new ArrayList<>();
     }
 
-    private void addFields() throws Exception{
+    private void addFields() {
         ResultSet rs = database.sendSelect("SELECT * FROM job_board");
-        ResultSetMetaData rsMeta = rs.getMetaData();
-
-        int colCount = rsMeta.getColumnCount();
-        for(int i = 1; i <= colCount; i++){
-            JLabel label = new JLabel(rsMeta.getColumnName(i));
-            label.setForeground(Color.white);
-            label.setFont(new Font("SansSerif", Font.BOLD, 20));
-            JTextField text = new JTextField();
-            text.setPreferredSize(new Dimension(200,30));
-            text.setCaretColor(Color.white);
-            text.setBackground(new Color(60,60,60));
-            text.setForeground(Color.WHITE);
-            text.setFont(new Font("SansSerif", Font.PLAIN, 20));
-            JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-            panel.setBackground(new Color(40,40,40));
-            panel.add(label);
-            panel.add(text);
-            fields.add(panel);
-            fieldsPanel.add(panel);
-        }
-    }
-
-    public void populateRequiredFields(){
-        String file = "src\\requiredFields.txt";
-        BufferedReader reader = null;
-        String line = "";
-        try{
-            reader = new BufferedReader(new FileReader(file));
-            while((line = reader.readLine()) != null){
-                requiredValues = line.split(",");
-
-                for(String s : requiredValues)
-                    System.out.println(s);
+        ResultSetMetaData rsMeta = null;
+        try {
+            rsMeta = rs.getMetaData();
+            int colCount = rsMeta.getColumnCount();
+            for (int i = 1; i <= colCount; i++) {
+                JLabel label = new JLabel(rsMeta.getColumnName(i));
+                label.setForeground(Color.white);
+                label.setFont(new Font("SansSerif", Font.BOLD, 20));
+                JTextField text = new JTextField();
+                text.setPreferredSize(new Dimension(200, 30));
+                text.setCaretColor(Color.white);
+                text.setBackground(new Color(60, 60, 60));
+                text.setForeground(Color.WHITE);
+                text.setFont(new Font("SansSerif", Font.PLAIN, 20));
+                JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+                panel.setBackground(new Color(40, 40, 40));
+                panel.add(label);
+                panel.add(text);
+                fields.add(panel);
+                fieldsPanel.add(panel);
             }
-        }
-        catch(Exception e){
+        }catch (SQLException e){
+            database.closeResources();
             e.printStackTrace();
-        }
-        finally {
-            try {
-                reader.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+        }finally {
+            database.closeResources();
         }
     }
 
-    private boolean verifyRequiredFields() {
 
-        for(int i = 0; i < fields.size(); i++){
-            JLabel label = (JLabel) fields.get(i).getComponent(0);
-            JTextField textField = (JTextField) fields.get(i).getComponent(1);
-            String labelName = label.getText();
-            for(String s : requiredValues){
-                if(labelName.equals(s) && textField.getText().isBlank()){
-                    JOptionPane.showMessageDialog(null, "Missing field: "+s, null, JOptionPane.INFORMATION_MESSAGE);
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
 
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == createButton){
-            if(verifyRequiredFields()){
-                InsertQueryBuilder qb = new InsertQueryBuilder();
-                qb.insertInto("job_board");
-                for(JPanel p : fields){
-                    JTextField text = (JTextField) p.getComponent(1);
-                    String str = text.getText();
-                    if(!str.isBlank())
-                        qb.values(str);
-                }
-                try {
+            InsertQueryBuilder qb = new InsertQueryBuilder();
+            qb.insertInto("job_board");
+            boolean notEmpty = true;
+            for(JPanel p : fields){
+                JTextField text = (JTextField) p.getComponent(1);
+                String str = text.getText();
+                if(!str.isBlank())
+                    qb.values(str);
+                else
+                    notEmpty = false;
+            }
+            try {
+                if(notEmpty)
                     database.sendUpdate(qb.build());
-                } catch (Exception ex) {
-                    throw new RuntimeException(ex);
-                }
+                else
+                    JOptionPane.showMessageDialog(null, "You have empty values", null, JOptionPane.INFORMATION_MESSAGE);
+            } catch (SQLException ex) {
+                    ex.printStackTrace();
+            }finally {
+                database.closeResources();
             }
         }
         if(e.getSource() == resetButton){
