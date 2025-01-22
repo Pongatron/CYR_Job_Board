@@ -4,16 +4,11 @@ import DatabaseInteraction.*;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.EtchedBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.List;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 
@@ -26,6 +21,7 @@ public class InsertWindow extends JFrame implements ActionListener {
     JPanel fieldsPanel;
     JButton createButton;
     JButton resetButton;
+    ArrayList<String> requiredCols;
 
     public InsertWindow(){
         database = new DatabaseInteraction();
@@ -39,7 +35,7 @@ public class InsertWindow extends JFrame implements ActionListener {
         this.add(centerPanel);
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         this.setTitle("Add Job");
-        this.setPreferredSize(new Dimension(500, 850));
+        this.setPreferredSize(new Dimension(900, 550));
         this.setBackground(new Color(24,24,24));
         this.pack();
         this.setLocationRelativeTo(null);
@@ -69,8 +65,27 @@ public class InsertWindow extends JFrame implements ActionListener {
         fields = new ArrayList<>();
     }
 
-    private void addFields() {
-        ResultSet rs = database.sendSelect("SELECT * FROM job_board");
+    private void addFields()  {
+        ResultSet rsRequired = database.sendSelect("SELECT * FROM required_columns");
+        requiredCols = new ArrayList<>();
+        SelectQueryBuilder qb = new SelectQueryBuilder();
+        try {
+
+            while (rsRequired.next()) {
+                requiredCols.add(rsRequired.getObject(1).toString());
+            }
+        }catch (SQLException ex){
+            ex.printStackTrace();
+        }
+        for(String s : requiredCols) {
+            System.out.println(s);
+            qb.select(s);
+        }
+
+        qb.from("job_board");
+        System.out.println(qb.build());
+
+        ResultSet rs = database.sendSelect(qb.build());
         ResultSetMetaData rsMeta = null;
         try {
             rsMeta = rs.getMetaData();
@@ -107,12 +122,18 @@ public class InsertWindow extends JFrame implements ActionListener {
         if(e.getSource() == createButton){
             InsertQueryBuilder qb = new InsertQueryBuilder();
             qb.insertInto("job_board");
+            for(String s : requiredCols) {
+                qb.setColumns(s);
+            }
             boolean notEmpty = true;
             for(JPanel p : fields){
+                JLabel label = (JLabel) p.getComponent(0);
                 JTextField text = (JTextField) p.getComponent(1);
                 String str = text.getText();
-                if(!str.isBlank())
-                    qb.values(str);
+                if(!str.isBlank()) {
+                    qb.setColumns(label.getText());
+                    qb.setValues(str);
+                }
                 else
                     notEmpty = false;
             }

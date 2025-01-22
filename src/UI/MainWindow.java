@@ -190,7 +190,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         tableScroll = new JScrollPane(table);
         tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
-        tableScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        tableScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         tableScroll.setPreferredSize(new Dimension(500,0));
         tableScroll.getViewport().setBackground(new Color(24,24,24));
         tableScroll.getVerticalScrollBar().setBackground(new Color(24,24,24));
@@ -236,8 +236,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         for (int i = 1; i <= colCount; i++) {
             tableModel.addColumn(rsMeta.getColumnLabel(i));
         }
-
-
 
         Object[] row = new Object[colCount];
         Object[] emptyRow = new Object[colCount];
@@ -315,7 +313,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         }
 
         table.getTableHeader().setPreferredSize(new Dimension(table.getTableHeader().getPreferredSize().width, 100));
-        datesTable.getTableHeader().setPreferredSize(new Dimension(table.getTableHeader().getPreferredSize().width, 100));
+        datesTable.getTableHeader().setPreferredSize(new Dimension(datesTable.getTableHeader().getPreferredSize().width, 100));
 
         database.closeResources();
     }
@@ -323,9 +321,16 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == addJobButton){
-                new InsertWindow();
+            new InsertWindow();
         }
         if(e.getSource() == updateJobButton){
+            int selectedRow = table.getSelectedRow();
+            if(selectedRow != -1) {
+                String selectedJwo = table.getValueAt(selectedRow, 0).toString();
+                new UpdateWindow(selectedJwo);
+            }
+        }
+        if(e.getSource() == deleteButton){
             SelectQueryBuilder qb = new SelectQueryBuilder();
             qb.select("*");
             qb.from("job_board");
@@ -334,9 +339,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             } catch (SQLException ex) {
                 ex.printStackTrace();
             }
-        }
-        if(e.getSource() == deleteButton){
-
         }
         if(e.getSource() == jwoFilterButton){
             SelectQueryBuilder qb = new SelectQueryBuilder();
