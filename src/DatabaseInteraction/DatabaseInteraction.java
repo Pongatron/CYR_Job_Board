@@ -55,6 +55,7 @@ public class DatabaseInteraction {
         } catch (SQLException e) {
             closeResources();
             e.printStackTrace();
+            throw e;
         }finally {
             try { ps.close(); } catch (Exception ex) {/*Ignored*/}
         }

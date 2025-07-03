@@ -7,6 +7,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import java.util.ArrayList;
 
 public class TableCustom {
 
@@ -108,5 +109,10 @@ public class TableCustom {
             maxWidth = Math.max(maxWidth, cellComponent.getPreferredSize().width);
         }
         return maxWidth;
+    }
+
+    public static void applyDates(JTable table, ArrayList<DateRange> dates){
+        DateTableCustomCellRenderer renderer = (DateTableCustomCellRenderer) table.getDefaultRenderer(Object.class);
+        renderer.setDates(dates);
     }
 }

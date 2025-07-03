@@ -1,8 +1,7 @@
 package UI;
 
 import DatabaseInteraction.*;
-import Table.RotatedHeaderRenderer;
-import Table.TableCustom;
+import Table.*;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -14,15 +13,11 @@ import java.awt.event.*;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
-import java.util.TimerTask;
 
 import static DatabaseInteraction.Filter.FilterStatus.*;
 
@@ -231,10 +226,11 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         ResultSetMetaData rsMeta = rs.getMetaData();
         DefaultTableModel tableModel = new DefaultTableModel();
         DefaultTableModel dateTableModel = new DefaultTableModel();
-        int colCount = rsMeta.getColumnCount();
 
+        int colCount = rsMeta.getColumnCount();
         for (int i = 1; i <= colCount; i++) {
-            tableModel.addColumn(rsMeta.getColumnLabel(i));
+            String columnName = rsMeta.getColumnLabel(i).replace("_", " ");
+            tableModel.addColumn(columnName);
         }
 
         Object[] row = new Object[colCount];
@@ -254,13 +250,20 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         LocalDate oneYearFromNow = today.plusDays(365);
         LocalDate currentDate = ninetyDaysAgo;
         ArrayList<LocalDate> saturdayList = new ArrayList<>();
+        int saturdayCount = 0;
+
         for(int i = 0; i < table.getRowCount(); i++){
             java.sql.Date sqlDate = (java.sql.Date) table.getValueAt(i,6);
             LocalDate date = sqlDate.toLocalDate();
             if(date.getDayOfWeek() == DayOfWeek.SATURDAY) {
-                saturdayList.add(date);
+                if(!saturdayList.contains(date)) {
+                    saturdayList.add(date);
+                    saturdayCount++;
+                }
             }
         }
+        System.out.println(saturdayList.size());
+        System.out.println(saturdayCount);
         while(!currentDate.isAfter(oneYearFromNow)){
             if(currentDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
                 if(currentDate.getDayOfWeek() == DayOfWeek.SATURDAY) {
@@ -299,13 +302,96 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         }
 
         datesTable.getTableHeader().setDefaultRenderer(new RotatedHeaderRenderer(datesTable));
+
+        int buildIndex = 15;
+        int finishIndex = 16;
+        int installIndex = 17;
+        ArrayList<DateRange> dates = new ArrayList<>();
+        for(int i = 0; i < datesTable.getRowCount(); i++){
+            java.sql.Date sqlDate = (java.sql.Date) table.getValueAt(i,6);
+            LocalDate dueDate = sqlDate.toLocalDate();
+
+            int buildDays = (int)table.getValueAt(i, buildIndex);
+            int finishDays = (int)table.getValueAt(i, finishIndex);
+            int installDays = (int)table.getValueAt(i, installIndex);
+
+            LocalDate buildStart = dueDate.minusDays(buildDays + finishDays);
+            LocalDate finishStart = dueDate.minusDays(finishDays);
+            LocalDate installEnd = dueDate.plusDays(installDays-1);
+
+
+            System.out.println(buildStart);
+            System.out.println(finishStart);
+            System.out.println(installEnd);
+
+            int days = 0;
+            boolean isSaturday = false;
+            LocalDate tempDate = today;
+            while(!tempDate.isAfter(dueDate)){
+                if(tempDate.getDayOfWeek() != DayOfWeek.SATURDAY && tempDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                    days++;
+                }
+                tempDate = tempDate.plusDays(1);
+            }
+            int dueDateCol = -1;
+            if(!dueDate.isBefore(ninetyDaysAgo)) {
+                dueDateCol = todayCol + days;
+            }
+            if(dueDate.getDayOfWeek() == DayOfWeek.SATURDAY){
+                isSaturday = true;
+            }
+            int satIndex = -1;
+            for(LocalDate sat: saturdayList){
+                System.out.println(sat.toString());
+                String formattedSat = sat.format(dateFormat);
+                satIndex = datesTable.getColumnModel().getColumnIndex(formattedSat);
+                System.out.println(satIndex);
+                if(satIndex >= (dueDateCol - finishDays - buildDays) && satIndex <= (dueDateCol + installDays-1)){
+                    if(satIndex >= (dueDateCol - finishDays - buildDays) && satIndex < (dueDateCol - finishDays)){
+                        buildDays++;
+                    }
+                    else if(satIndex >= (dueDateCol - finishDays) && satIndex < (dueDateCol)){
+                        finishDays++;
+                    }
+                    else if(satIndex >= (dueDateCol) && satIndex < (dueDateCol + installDays-1)){
+                        installDays++;
+                    }
+                }
+            }
+
+//            for(LocalDate saturday : saturdayList){
+//                if(saturday.isAfter(buildStart) && saturday.isBefore(installEnd)){
+//                    if(saturday.isAfter(buildStart.minusDays(1)) && saturday.isBefore(finishStart)){
+//                        buildDays++;
+//                    }
+//                    else if(saturday.isAfter(finishStart.minusDays(1)) && saturday.isBefore(dueDate)){
+//                        finishDays++;
+//                    }
+//                    else if(saturday.isAfter(dueDate.minusDays(1)) && saturday.isBefore(installEnd.plusDays(1))){
+//                        installDays++;
+//                    }
+//                }
+//            }
+
+
+
+
+
+
+
+            System.out.println("due date: "+dueDate+" col: "+dueDateCol);
+
+            dates.add(new DateRange(dueDateCol, buildDays, finishDays, installDays, isSaturday));
+        }
+        TableCustom.applyDates(datesTable, dates);
+
         for (int i = 0; i < datesTable.getColumnModel().getColumnCount(); i++) {
             datesTable.getColumnModel().getColumn(i).setMinWidth(30);
             datesTable.getColumnModel().getColumn(i).setMaxWidth(30);
             datesTable.getColumnModel().getColumn(i).setPreferredWidth(30);
         }
 
-        if(todayCol != 1) {
+        if(todayCol != -1) {
             Rectangle cellRect = datesTable.getCellRect(0, todayCol, true);
             JScrollBar hScrollBar = datesScroll.getHorizontalScrollBar();
             hScrollBar.setValue(cellRect.x);
@@ -316,6 +402,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         datesTable.getTableHeader().setPreferredSize(new Dimension(datesTable.getTableHeader().getPreferredSize().width, 100));
 
         database.closeResources();
+
     }
 
     @Override
