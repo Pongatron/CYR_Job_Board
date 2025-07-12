@@ -2,8 +2,11 @@ package Table;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 
 public class DateTableCustomCellRenderer extends DefaultTableCellRenderer {
@@ -24,54 +27,52 @@ public class DateTableCustomCellRenderer extends DefaultTableCellRenderer {
 
     @Override
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-        Component com = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-        setBorder( new EmptyBorder(10,10,10,10));
+        JComponent com = (JComponent) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+        com.setBorder( new EmptyBorder(10,10,10,10));
+        com.setFont(table.getFont());
+
+        if(table.getColumnName(column).contains("Mon"))
+            colIndex = column;
+
+        if(row % 2 == 0){
+            com.setBackground(ROW1_COLOR);
+        }
+        else{
+            com.setBackground(ROW2_COLOR);
+        }
+        com.setForeground(Color.white);
 
         DateRange dateRange = dates.get(row);
-        int dueCol = dateRange.getDueDateCol();
-        int buildCol = dueCol - dateRange.getFinishDays() - dateRange.getBuildDays();
-        int finishCol = dueCol - dateRange.getFinishDays();
-        int installCol = dueCol + dateRange.getInstallDays()-1;
-        boolean isSaturday = dateRange.isDueDateSaturday();
-
-
+        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E-dd-MMM");
         if(isSelected){
             com.setBackground(table.getSelectionBackground());
         }
         else{
             if(row == hoverRow.getIndex()){
                 com.setBackground(HOVER_COLOR);
-                com.setForeground(Color.white);
             }
-            else if(column >= buildCol && column < finishCol){
-                com.setBackground(BUILD_COLOR);
-                com.setForeground(Color.white);
-            }
-            else if(column >= finishCol && column < dueCol){
-                com.setBackground(FINISH_COLOR);
-                com.setForeground(Color.white);
-            }
-            else if(column >= dueCol && column <= installCol && dueCol != -1){
-                com.setBackground(INSTALL_COLOR);
-                com.setForeground(Color.white);
-            }
-
-            else{
-                if(row % 2 == 0){
-                    com.setBackground(ROW1_COLOR);
-                    com.setForeground(Color.white);
+            for(LocalDate date : dateRange.getBuildDays()){
+                String dateString = date.format(dateFormat);
+                if(dateString.equals(table.getColumnName(column))){
+                    com.setBackground(BUILD_COLOR);
+                    break;
                 }
-                else{
-                    com.setBackground(ROW2_COLOR);
-                    com.setForeground(Color.white);
+            }
+            for(LocalDate date : dateRange.getFinishDays()){
+                String dateString = date.format(dateFormat);
+                if(dateString.equals(table.getColumnName(column))){
+                    com.setBackground(FINISH_COLOR);
+                    break;
+                }
+            }
+            for(LocalDate date : dateRange.getInstallDays()){
+                String dateString = date.format(dateFormat);
+                if(dateString.equals(table.getColumnName(column))){
+                    com.setBackground(INSTALL_COLOR);
+                    break;
                 }
             }
         }
-        com.setFont(table.getFont());
-
-        if(table.getColumnName(column).contains("Mon"))
-            colIndex = column;
-
         return com;
     }
 

@@ -37,6 +37,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JButton dateFilterButton;
     private JButton todayButton;
     private JButton resetViewButton;
+    private JButton plusZoomButton;
+    private JButton minusZoomButton;
     private JScrollPane tableScroll;
     private JScrollPane datesScroll;
     private JTable table;
@@ -69,6 +71,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         topContainerPanel.add(buttonPanel);
         topContainerPanel.add(resetViewButton);
         topContainerPanel.add(todayButton);
+        topContainerPanel.add(plusZoomButton);
+        topContainerPanel.add(minusZoomButton);
 
         mainBar.add(topContainerPanel);
 
@@ -104,6 +108,9 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         datesTable.setDefaultEditor(Object.class, null);
         datesTable.getTableHeader().setReorderingAllowed(false);
         datesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        datesTable.setRowSelectionAllowed(false);
+        datesTable.setColumnSelectionAllowed(false);
+        datesTable.setCellSelectionEnabled(false);
         datesTable.setBackground(new Color(24,24,24));
 
         topPanel = new JPanel();
@@ -177,6 +184,20 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         resetViewButton.setFont(BOLD_FONT);
         resetViewButton.setFocusable(false);
         resetViewButton.addActionListener(this);
+
+        plusZoomButton = new JButton("+");
+        plusZoomButton.setBackground(new Color(0, 0, 0));
+        plusZoomButton.setForeground(new Color(255,255,255));
+        plusZoomButton.setFont(BOLD_FONT);
+        plusZoomButton.setFocusable(false);
+        plusZoomButton.addActionListener(this);
+
+        minusZoomButton = new JButton("-");
+        minusZoomButton.setBackground(new Color(0, 0, 0));
+        minusZoomButton.setForeground(new Color(255,255,255));
+        minusZoomButton.setFont(BOLD_FONT);
+        minusZoomButton.setFocusable(false);
+        minusZoomButton.addActionListener(this);
 
         mainBar = new JToolBar();
         mainBar.setFloatable(false);
@@ -314,74 +335,107 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             int buildDays = (int)table.getValueAt(i, buildIndex);
             int finishDays = (int)table.getValueAt(i, finishIndex);
             int installDays = (int)table.getValueAt(i, installIndex);
-
-            LocalDate buildStart = dueDate.minusDays(buildDays + finishDays);
-            LocalDate finishStart = dueDate.minusDays(finishDays);
-            LocalDate installEnd = dueDate.plusDays(installDays-1);
+            int daysBack = buildDays + finishDays;
+            int daysForward = installDays - 1;
 
 
-            System.out.println(buildStart);
-            System.out.println(finishStart);
-            System.out.println(installEnd);
-
-            int days = 0;
             boolean isSaturday = false;
-            LocalDate tempDate = today;
-            while(!tempDate.isAfter(dueDate)){
-                if(tempDate.getDayOfWeek() != DayOfWeek.SATURDAY && tempDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
-                    days++;
-                }
-                tempDate = tempDate.plusDays(1);
-            }
-            int dueDateCol = -1;
-            if(!dueDate.isBefore(ninetyDaysAgo)) {
-                dueDateCol = todayCol + days;
-            }
+
             if(dueDate.getDayOfWeek() == DayOfWeek.SATURDAY){
                 isSaturday = true;
             }
-            int satIndex = -1;
-            for(LocalDate sat: saturdayList){
-                System.out.println(sat.toString());
-                String formattedSat = sat.format(dateFormat);
-                satIndex = datesTable.getColumnModel().getColumnIndex(formattedSat);
-                System.out.println(satIndex);
-                if(satIndex >= (dueDateCol - finishDays - buildDays) && satIndex <= (dueDateCol + installDays-1)){
-                    if(satIndex >= (dueDateCol - finishDays - buildDays) && satIndex < (dueDateCol - finishDays)){
-                        buildDays++;
-                    }
-                    else if(satIndex >= (dueDateCol - finishDays) && satIndex < (dueDateCol)){
-                        finishDays++;
-                    }
-                    else if(satIndex >= (dueDateCol) && satIndex < (dueDateCol + installDays-1)){
-                        installDays++;
-                    }
+
+            LocalDate buildStart = dueDate;
+            LocalDate finishStart = dueDate;
+            LocalDate installEnd = dueDate;
+
+            ArrayList<LocalDate> buildDates = new ArrayList<>();
+            ArrayList<LocalDate> finishDates = new ArrayList<>();
+            ArrayList<LocalDate> installDates = new ArrayList<>();
+
+            System.out.println("-----Due Date: "+dueDate);
+            for(int j = 0; j >= -(daysBack); ){
+                buildStart = buildStart.minusDays(1);
+                if(!buildStart.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !buildStart.getDayOfWeek().equals(DayOfWeek.SUNDAY)){
+                    j--;
                 }
             }
+            System.out.println("Build start: "+buildStart);
+            for(int j = 0; j >= -(daysBack-buildDays); ){
+                finishStart = finishStart.minusDays(1);
+                if(!finishStart.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !finishStart.getDayOfWeek().equals(DayOfWeek.SUNDAY)){
+                    j--;
+                }
+            }
+            System.out.println("Finish start: "+finishStart);
+            for(int j = 0; j < daysForward; ){
+                installEnd = installEnd.plusDays(1);
+                if(!installEnd.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !installEnd.getDayOfWeek().equals(DayOfWeek.SUNDAY)){
+                    j++;
+                }
+                else if(installEnd.getDayOfWeek().equals(DayOfWeek.SATURDAY) && dueDate.getDayOfWeek().equals(DayOfWeek.SATURDAY)){
+                    j++;
+                }
+            }
+            System.out.println("Install end: "+installEnd);
+            LocalDate tempDatePopulator = buildStart;
+            for(int j = 0; j < (daysBack-finishDays);){
+                tempDatePopulator = tempDatePopulator.plusDays(1);
+                if(!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)){
+                    j++;
+                    buildDates.add(tempDatePopulator);
+                }
+            }
+            tempDatePopulator = finishStart;
+            for(int j = 0; j < (finishDays);){
+                tempDatePopulator = tempDatePopulator.plusDays(1);
+                if(!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)){
+                    j++;
+                    finishDates.add(tempDatePopulator);
+                }
+            }
+            tempDatePopulator = dueDate;
+            for(int j = 0; j < (installDays);){
 
-//            for(LocalDate saturday : saturdayList){
-//                if(saturday.isAfter(buildStart) && saturday.isBefore(installEnd)){
-//                    if(saturday.isAfter(buildStart.minusDays(1)) && saturday.isBefore(finishStart)){
+                if(!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)){
+                    j++;
+                    installDates.add(tempDatePopulator);
+                }
+                else if(tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && dueDate.getDayOfWeek().equals(DayOfWeek.SATURDAY)){
+                    j++;
+                    installDates.add(tempDatePopulator);
+                }
+                tempDatePopulator = tempDatePopulator.plusDays(1);
+            }
+
+//            for(LocalDate date : buildDates){
+//                System.out.println("Build date: "+date);
+//            }
+            dates.add(new DateRange(dueDate, buildDates, finishDates, installDates, isSaturday));
+
+
+//            int satIndex = -1;
+//            for(LocalDate sat: saturdayList){
+//                System.out.println(sat.toString());
+//                String formattedSat = sat.format(dateFormat);
+//                satIndex = datesTable.getColumnModel().getColumnIndex(formattedSat);
+//                System.out.println(satIndex);
+//                if(satIndex >= (dueDateCol - finishDays - buildDays) && satIndex <= (dueDateCol + installDays-1)){
+//                    if(satIndex >= (dueDateCol - finishDays - buildDays) && satIndex < (dueDateCol - finishDays)){
 //                        buildDays++;
 //                    }
-//                    else if(saturday.isAfter(finishStart.minusDays(1)) && saturday.isBefore(dueDate)){
+//                    else if(satIndex >= (dueDateCol - finishDays) && satIndex < (dueDateCol)){
 //                        finishDays++;
 //                    }
-//                    else if(saturday.isAfter(dueDate.minusDays(1)) && saturday.isBefore(installEnd.plusDays(1))){
+//                    else if(satIndex >= (dueDateCol) && satIndex < (dueDateCol + installDays-1)){
 //                        installDays++;
 //                    }
 //                }
 //            }
-
-
-
-
-
-
-
-            System.out.println("due date: "+dueDate+" col: "+dueDateCol);
-
-            dates.add(new DateRange(dueDateCol, buildDays, finishDays, installDays, isSaturday));
+//
+//            System.out.println("due date: "+dueDate+" col: "+dueDateCol);
+//
+//            dates.add(new DateRange(dueDateCol, buildDays, finishDays, installDays, isSaturday));
         }
         TableCustom.applyDates(datesTable, dates);
 

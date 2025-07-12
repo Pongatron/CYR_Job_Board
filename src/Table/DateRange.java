@@ -1,19 +1,22 @@
 package Table;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+
 public class DateRange {
 
 
-    private int dueDateCol = -1;
-    private int buildDays = -1;
-    private int finishDays = -1;
-    private int installDays = -1;
+    private LocalDate dueDate;
+    private ArrayList<LocalDate> buildDays;
+    private ArrayList<LocalDate> finishDays;
+    private ArrayList<LocalDate> installDays;
 
 
 
     private boolean isDueDateSaturday = false;
 
-    public DateRange(int dueDateCol, int buildDays, int finishDays, int installDays, boolean isSaturday){
-        this.dueDateCol = dueDateCol;
+    public DateRange(LocalDate dueDate, ArrayList<LocalDate> buildDays, ArrayList<LocalDate> finishDays, ArrayList<LocalDate> installDays, boolean isSaturday){
+        this.dueDate = dueDate;
         this.buildDays = buildDays;
         this.finishDays = finishDays;
         this.installDays = installDays;
@@ -22,16 +25,16 @@ public class DateRange {
         }
     }
 
-    public int getDueDateCol() {
-        return dueDateCol;
+    public LocalDate getDueDate() {
+        return dueDate;
     }
-    public int getBuildDays() {
+    public ArrayList<LocalDate> getBuildDays() {
         return buildDays;
     }
-    public int getFinishDays() {
+    public ArrayList<LocalDate> getFinishDays() {
         return finishDays;
     }
-    public int getInstallDays() {
+    public ArrayList<LocalDate> getInstallDays() {
         return installDays;
     }
     public boolean isDueDateSaturday() {
