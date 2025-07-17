@@ -19,17 +19,24 @@ public class TableHeaderCustomCellRenderer extends DefaultTableCellRenderer {
 
     @Override
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-        Component com = super.getTableCellRendererComponent(table,value,isSelected,hasFocus,row,column);
+        JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+        String originalText = value.toString();
+
+        String wrappedText = "<html><center style='text-align: left'>" + originalText.replace(" ", "<br>") + "</center></html>";
+        label.setText(wrappedText);
+
         Component oldHeader = oldCellRenderer.getTableCellRendererComponent(table,value,isSelected,hasFocus,row,column);
+
         JLabel oldLabel = (JLabel) oldHeader;
-        JLabel label = (JLabel) com;
         label.setHorizontalTextPosition(oldLabel.getHorizontalTextPosition());
         label.setIcon(oldLabel.getIcon());
-        this.setBorder(new EmptyBorder(8,10,8,10));
-        com.setFont(table.getTableHeader().getFont());
-        com.setBackground(table.getTableHeader().getBackground());
-        ((JLabel) com).setVerticalAlignment(SwingConstants.BOTTOM);
-        return com;
+        label.setVerticalAlignment(SwingConstants.CENTER);
+        this.setBorder(new EmptyBorder(8, 10, 8, 10));
+        label.setFont(table.getTableHeader().getFont());
+        label.setBackground(table.getTableHeader().getBackground());
+        label.setOpaque(true);
+
+        return label;
     }
 
     @Override
