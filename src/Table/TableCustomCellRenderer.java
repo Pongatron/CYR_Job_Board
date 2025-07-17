@@ -18,28 +18,53 @@ public class TableCustomCellRenderer extends DefaultTableCellRenderer {
 
     @Override
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-        Component com = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+        JLabel label = (JLabel)super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
         setBorder( new EmptyBorder(10,10,10,10));
         if(isSelected){
-            com.setBackground(table.getSelectionBackground());
+            label.setBackground(table.getSelectionBackground());
         }
         else{
             if(row == hoverRow.getIndex()){
-                com.setBackground(HOVER_COLOR);
-                com.setForeground(Color.white);
+                label.setBackground(HOVER_COLOR);
+                label.setForeground(Color.white);
             }
             else{
                 if(row % 2 == 0){
-                    com.setBackground(ROW1_COLOR);
-                    com.setForeground(Color.white);
+                    label.setBackground(ROW1_COLOR);
+                    label.setForeground(Color.white);
                 }
                 else{
-                    com.setBackground(ROW2_COLOR);
-                    com.setForeground(Color.white);
+                    label.setBackground(ROW2_COLOR);
+                    label.setForeground(Color.white);
                 }
             }
         }
-        com.setFont(table.getFont());
-        return com;
+        label.setFont(table.getFont());
+
+        // Shows tooltip only if the text is too wide for the cell
+        if (value != null) {
+            String text = value.toString();
+            label.setText(text);
+
+            // Calculate available space
+            FontMetrics fm = label.getFontMetrics(label.getFont());
+            int textWidth = fm.stringWidth(text);
+
+            int columnWidth = table.getColumnModel().getColumn(column).getWidth();
+
+            // Subtract padding/insets (label padding + border)
+            Insets insets = label.getInsets();
+            int availableWidth = columnWidth - insets.left - insets.right;
+
+            if (textWidth > availableWidth) {
+                label.setToolTipText(text);
+            } else {
+                label.setToolTipText(null);
+            }
+        } else {
+            label.setToolTipText(null);
+            label.setText("");
+        }
+        return label;
     }
 }

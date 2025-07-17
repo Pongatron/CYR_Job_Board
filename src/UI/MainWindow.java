@@ -23,12 +23,15 @@ import static DatabaseInteraction.Filter.FilterStatus.*;
 
 public class MainWindow extends JFrame implements ActionListener, MouseListener {
 
+    private static final int ABSOLUTE_MIN_CELL_WIDTH = 50;
+    private static final int MAX_CELL_WIDTH = 125;
     private static final int BASE_FONT_SIZE = 12;
     private static final Dimension TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
     private static final Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(400, 100);
     private static final Dimension TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
     private static final Font PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
     private static final Font BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
+    DateTimeFormatter cellDateFormat = DateTimeFormatter.ofPattern("MM/dd/yy");
 
     private final DatabaseInteraction database;
     private JPanel centerPanel;
@@ -261,6 +264,11 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         while (rs.next()) {
             for (int i = 0; i < colCount; i++) {
                 row[i] = rs.getObject(i + 1);
+                if(row[i] instanceof java.sql.Date){
+                    LocalDate cellDate = ((Date) row[i]).toLocalDate();
+                    String date = cellDate.format(cellDateFormat);
+                    row[i] = date;
+                }
             }
             dataTableModel.addRow(row);
             datesTableModel.addRow(emptyRow);
@@ -279,8 +287,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         ArrayList<LocalDate> saturdayList = new ArrayList<>();
 
         for(int i = 0; i < dataTable.getRowCount(); i++){
-            Date sqlDate = (Date) dataTable.getValueAt(i,6);
-            LocalDate date = sqlDate.toLocalDate();
+
+            LocalDate date = LocalDate.parse(dataTable.getValueAt(i,6).toString(), cellDateFormat);
             if(date.getDayOfWeek() == DayOfWeek.SATURDAY) {
                 if(!saturdayList.contains(date)) {
                     saturdayList.add(date);
@@ -316,18 +324,24 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         // calculate each column width and set it as the preferred size so nothing looks cut off
         totalWidth = 0;
-        FontMetrics fontMetrics = dataTable.getFontMetrics(dataTable.getFont());
         for(int col = 0; col < dataTable.getColumnCount(); col++){
-            int maxWidth = fontMetrics.stringWidth(dataTableModel.getColumnName(col));
+            TableColumn column = dataTable.getColumnModel().getColumn(col);
+            TableCellRenderer headerRenderer = dataTable.getTableHeader().getDefaultRenderer();
+            Component headerComp = headerRenderer.getTableCellRendererComponent(dataTable, column.getHeaderValue(), false, false, -1, col);
+            int minWidth = headerComp.getPreferredSize().width;
+
             for(int i = 0; i < dataTable.getRowCount(); i++){
                 TableCellRenderer cellRenderer = dataTable.getCellRenderer(i, col);
                 Component comp = dataTable.prepareRenderer(cellRenderer, i, col);
                 int cellWidth = comp.getPreferredSize().width;
-                maxWidth = Math.max(maxWidth, cellWidth);
+                if(cellWidth < MAX_CELL_WIDTH)
+                    minWidth = Math.max(minWidth, cellWidth);
             }
-            dataTable.getColumnModel().getColumn(col).setMinWidth(dataTable.getColumnModel().getColumn(col).getPreferredWidth());
-            dataTable.getColumnModel().getColumn(col).setPreferredWidth(maxWidth);
-            totalWidth += maxWidth+25;
+            column.setPreferredWidth(minWidth);
+            column.setMaxWidth(MAX_CELL_WIDTH);
+            column.setMinWidth(minWidth);
+
+            totalWidth += minWidth;
         }
         datesTable.getTableHeader().setDefaultRenderer(new RotatedHeaderRenderer(datesTable));
 
@@ -351,8 +365,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         int installIndex = 17;
         ArrayList<DateRange> dates = new ArrayList<>();
         for (int i = 0; i < datesTable.getRowCount(); i++) {
-            java.sql.Date sqlDate = (java.sql.Date) dataTable.getValueAt(i, 6);
-            LocalDate dueDate = sqlDate.toLocalDate();
+            LocalDate dueDate = LocalDate.parse(dataTable.getValueAt(i,6).toString(), cellDateFormat);
 
             // get amount of days for each section of time from data table
             int buildDays = (int) dataTable.getValueAt(i, buildIndex);
@@ -473,13 +486,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == addJobButton){
-            new InsertWindow();
+            new AddJobWindow();
         }
         if(e.getSource() == updateJobButton){
             int selectedRow = dataTable.getSelectedRow();
             if(selectedRow != -1) {
                 String selectedJwo = dataTable.getValueAt(selectedRow, 0).toString();
-                new UpdateWindow(selectedJwo);
+                new UpdateJobWindow(selectedJwo);
             }
         }
         if(e.getSource() == deleteButton){

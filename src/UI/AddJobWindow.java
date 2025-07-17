@@ -1,7 +1,6 @@
 package UI;
 
 import DatabaseInteraction.*;
-import org.postgresql.util.PSQLException;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -9,16 +8,16 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.sql.SQLException;
-import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 
-public class InsertWindow extends JFrame implements ActionListener {
+public class AddJobWindow extends JFrame implements ActionListener {
 
     DatabaseInteraction database;
     String[] requiredValues;
     ArrayList<JPanel> fields;
+    JPanel topPanel;
     JPanel centerPanel;
     JPanel fieldsPanel;
     JPanel buttonsPanel;
@@ -29,14 +28,21 @@ public class InsertWindow extends JFrame implements ActionListener {
     int widest = 0;
     int shortest = 0;
 
-    public InsertWindow(){
+    public AddJobWindow(){
         database = new DatabaseInteraction();
         initializeComponents();
         addFields();
 
+        JLabel headingText = new JLabel("Add Job", SwingConstants.CENTER);
+        headingText.setForeground(new Color(200,40,40));
+        headingText.setFont(new Font(headingText.getFont().getFontName(), Font.BOLD, 30));
+        topPanel.add(headingText);
+
         buttonsPanel.add(createButton);
         buttonsPanel.add(resetButton);
 
+        centerPanel.add(topPanel);
+        centerPanel.add(Box.createVerticalStrut(10));
         centerPanel.add(fieldsPanel);
         centerPanel.add(Box.createVerticalStrut(10));
         centerPanel.add(buttonsPanel);
@@ -53,6 +59,10 @@ public class InsertWindow extends JFrame implements ActionListener {
     }
 
     private void initializeComponents() {
+
+        topPanel = new JPanel();
+        topPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        topPanel.setBackground(new Color(40,40,40));
 
         centerPanel = new JPanel();
         centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
