@@ -15,16 +15,16 @@ import java.sql.ResultSetMetaData;
 
 public class UpdateJobWindow extends JFrame implements ActionListener {
 
-    DatabaseInteraction database;
-    String[] requiredValues;
-    ArrayList<JPanel> fields;
-    JPanel topPanel;
-    JPanel centerPanel;
-    JPanel fieldsPanel;
-    JPanel buttonsPanel;
-    JButton updateButton;
-    JButton resetButton;
-    String selectedJwo;
+    private DatabaseInteraction database;
+    private String[] requiredValues;
+    private ArrayList<JPanel> fields;
+    private JPanel topPanel;
+    private JPanel centerPanel;
+    private JPanel fieldsPanel;
+    private JPanel buttonsPanel;
+    private JButton updateButton;
+    private JButton resetButton;
+    private String selectedJwo;
     private static final Color UPDATE_PANEL_COLOR = new Color(40, 40, 40);
 
     public UpdateJobWindow(String jwo){
@@ -72,6 +72,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
         fieldsPanel = new JPanel();
         fieldsPanel.setLayout(new GridLayout(0, 1, 0,10));
         fieldsPanel.setBackground(new Color(40,40,40));
+        fieldsPanel.setBorder(new EmptyBorder(5,5,5,5));
 
         buttonsPanel = new JPanel();
         buttonsPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 10));
@@ -111,6 +112,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                     text.setBackground(new Color(60, 60, 60));
                     text.setForeground(Color.WHITE);
                     text.setFont(new Font("SansSerif", Font.PLAIN, 20));
+                    text.setBorder(new EmptyBorder(5,5,5,5));
 
                     JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
                     panel.setBackground(new Color(40, 40, 40));

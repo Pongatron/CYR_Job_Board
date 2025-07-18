@@ -68,6 +68,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         SelectQueryBuilder qb = new SelectQueryBuilder();
         qb.select("*");
         qb.from("job_board");
+        qb.where("is_active = true");
         loadTable(database.sendSelect(qb.build()));
 
         buttonPanel.add(addJobButton);
@@ -496,13 +497,10 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             }
         }
         if(e.getSource() == deleteButton){
-            SelectQueryBuilder qb = new SelectQueryBuilder();
-            qb.select("*");
-            qb.from("job_board");
-            try {
-                loadTable(database.sendSelect(qb.build()));
-            } catch (SQLException ex) {
-                ex.printStackTrace();
+            int selectedRow = dataTable.getSelectedRow();
+            if(selectedRow != -1) {
+                String selectedJwo = dataTable.getValueAt(selectedRow, 0).toString();
+                new DeleteJobWindow(selectedJwo);
             }
         }
         if(e.getSource() == jwoFilterButton){
@@ -549,6 +547,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             SelectQueryBuilder qb = new SelectQueryBuilder();
             qb.select("*");
             qb.from("job_board");
+            qb.where("is_active = true");
             try {
                 loadTable(database.sendSelect(qb.build()));
             } catch (SQLException ex) {
