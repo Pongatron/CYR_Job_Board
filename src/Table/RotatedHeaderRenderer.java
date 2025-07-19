@@ -33,7 +33,7 @@ public class RotatedHeaderRenderer extends DefaultTableCellRenderer {
         com.setFont(table.getTableHeader().getFont());
 
 
-        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("E-dd-MMM");
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("E- dd- MMM");
         LocalDate today = LocalDate.now();
         String todayString = today.format(dateFormatter);
         String colHeader = table.getColumnName(column);

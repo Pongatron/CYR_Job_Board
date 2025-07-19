@@ -7,7 +7,7 @@ public class ZoomManager {
 
     public static float currentZoom = 1.0f;
     private static final float ZOOM_STEP = 0.1f;
-    private static final float MAX_ZOOM = 2.0f;
+    private static final float MAX_ZOOM = 1.5f;
     private static final float MIN_ZOOM = 0.5f;
 
 

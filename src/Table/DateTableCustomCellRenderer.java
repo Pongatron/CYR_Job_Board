@@ -49,7 +49,7 @@ public class DateTableCustomCellRenderer extends DefaultTableCellRenderer {
         com.setForeground(Color.white);
 
         DateRange dateRange = dates.get(row);
-        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E-dd-MMM");
+        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E- dd- MMM");
         if(isSelected){
             com.setBackground(table.getSelectionBackground());
         }

@@ -16,7 +16,7 @@ public class TableCustomCellRenderer extends DefaultTableCellRenderer {
     private static final Color HOVER_COLOR = new Color(18,18,18);
     private static final Color ROW1_COLOR = new Color(40,40,40);
     private static final Color ROW2_COLOR = new Color(64,64,64);
-    private static Border cellBorder = new EmptyBorder((int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()));
+    private static Border cellBorder = new EmptyBorder((int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()));
     private DateTimeFormatter cellDateFormat = DateTimeFormatter.ofPattern("MM/dd");
     public TableCustomCellRenderer(HoverIndex hoverRow){
         this.hoverRow = hoverRow;
@@ -26,7 +26,7 @@ public class TableCustomCellRenderer extends DefaultTableCellRenderer {
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
         JLabel label = (JLabel)super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
         cellBorder = new EmptyBorder((int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()));
-        setBorder(cellBorder);
+        label.setBorder(cellBorder);
 
 
         if(value instanceof LocalDate){

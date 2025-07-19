@@ -37,7 +37,7 @@ public class DatabaseInteraction {
     public ResultSet sendSelect(String query) {
         createConnection();
         try {
-            ps = connection.prepareStatement(query);
+            ps = connection.prepareStatement(query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             rs = ps.executeQuery();
         } catch (SQLException e) {
             closeResources();

@@ -1,6 +1,9 @@
 package Table;
 
+import UI.ZoomManager;
+
 import javax.swing.*;
+import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.JTableHeader;
@@ -11,6 +14,7 @@ public class TableHeaderCustomCellRenderer extends DefaultTableCellRenderer {
 
     private JTable table;
     private TableCellRenderer oldCellRenderer;
+    private static Border cellBorder = new EmptyBorder((int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()));
 
     public TableHeaderCustomCellRenderer(JTable table){
         this.table = table;
@@ -21,9 +25,13 @@ public class TableHeaderCustomCellRenderer extends DefaultTableCellRenderer {
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
         JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
         String originalText = value.toString();
+        cellBorder = new EmptyBorder((int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()),(int)(5* ZoomManager.getZoom()));
+        label.setBorder(cellBorder);
 
-        String wrappedText = "<html><center style='text-align: left'>" + originalText.replace(" ", "<br>") + "</center></html>";
-        label.setText(wrappedText);
+        if(originalText.contains(" ")) {
+            String wrappedText = "<html><center style='text-align: left'>" + originalText.replace(" ", "<br>") + "</center></html>";
+            label.setText(wrappedText);
+        }
 
         Component oldHeader = oldCellRenderer.getTableCellRendererComponent(table,value,isSelected,hasFocus,row,column);
 
@@ -31,7 +39,6 @@ public class TableHeaderCustomCellRenderer extends DefaultTableCellRenderer {
         label.setHorizontalTextPosition(oldLabel.getHorizontalTextPosition());
         label.setIcon(oldLabel.getIcon());
         label.setVerticalAlignment(SwingConstants.CENTER);
-        this.setBorder(new EmptyBorder(5, 5, 5, 5));
         label.setFont(table.getTableHeader().getFont());
         label.setBackground(table.getTableHeader().getBackground());
         label.setOpaque(true);
