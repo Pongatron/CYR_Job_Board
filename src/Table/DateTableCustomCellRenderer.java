@@ -1,6 +1,9 @@
 package Table;
 
+import UI.ZoomManager;
+
 import javax.swing.*;
+import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -18,6 +21,8 @@ public class DateTableCustomCellRenderer extends DefaultTableCellRenderer {
     private static final Color BUILD_COLOR = new Color(0,100,180);
     private static final Color FINISH_COLOR = new Color(200,170,0);
     private static final Color INSTALL_COLOR = new Color(200,40,40);
+    private static Border cellBorder = new EmptyBorder((int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()));
+
     private int colIndex = -1;
     private ArrayList<DateRange> dates;
 
@@ -28,7 +33,8 @@ public class DateTableCustomCellRenderer extends DefaultTableCellRenderer {
     @Override
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
         JComponent com = (JComponent) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-        com.setBorder( new EmptyBorder(10,10,10,10));
+        cellBorder = new EmptyBorder((int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()));
+        com.setBorder(cellBorder);
         com.setFont(table.getFont());
 
         if(table.getColumnName(column).contains("Mon"))

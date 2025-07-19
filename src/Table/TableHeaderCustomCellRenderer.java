@@ -31,7 +31,7 @@ public class TableHeaderCustomCellRenderer extends DefaultTableCellRenderer {
         label.setHorizontalTextPosition(oldLabel.getHorizontalTextPosition());
         label.setIcon(oldLabel.getIcon());
         label.setVerticalAlignment(SwingConstants.CENTER);
-        this.setBorder(new EmptyBorder(8, 10, 8, 10));
+        this.setBorder(new EmptyBorder(5, 5, 5, 5));
         label.setFont(table.getTableHeader().getFont());
         label.setBackground(table.getTableHeader().getBackground());
         label.setOpaque(true);

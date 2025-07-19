@@ -10,10 +10,7 @@ import javax.swing.event.ChangeListener;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.sql.Date;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
+import java.sql.*;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -23,15 +20,14 @@ import static DatabaseInteraction.Filter.FilterStatus.*;
 
 public class MainWindow extends JFrame implements ActionListener, MouseListener {
 
-    private static final int ABSOLUTE_MIN_CELL_WIDTH = 50;
-    private static final int MAX_CELL_WIDTH = 125;
-    private static final int BASE_FONT_SIZE = 12;
-    private static final Dimension TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
-    private static final Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(400, 100);
-    private static final Dimension TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
-    private static final Font PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
-    private static final Font BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
-    DateTimeFormatter cellDateFormat = DateTimeFormatter.ofPattern("MM/dd/yy");
+    private static  int ABSOLUTE_MIN_CELL_WIDTH = 50;
+    private static  int MAX_CELL_WIDTH = 200;
+    private static  int BASE_FONT_SIZE = 15;
+    private static  Dimension TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
+    private static  Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(400, 100);
+    private static  Dimension TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
+    private static  Font PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
+    private static  Font BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
 
     private final DatabaseInteraction database;
     private JPanel centerPanel;
@@ -45,6 +41,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JButton dateFilterButton;
     private JButton todayButton;
     private JButton resetViewButton;
+    private JButton showAllButton;
     private JButton plusZoomButton;
     private JButton minusZoomButton;
     private JScrollPane tableScroll;
@@ -65,11 +62,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         initializeComponents();
         syncScrollPanes();
 
-        SelectQueryBuilder qb = new SelectQueryBuilder();
-        qb.select("*");
-        qb.from("job_board");
-        qb.where("is_active = true");
-        loadTable(database.sendSelect(qb.build()));
+        refreshTable();
 
         buttonPanel.add(addJobButton);
         buttonPanel.add(updateJobButton);
@@ -82,6 +75,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         topContainerPanel.setBackground(new Color(24,24,24));
         topContainerPanel.add(buttonPanel);
         topContainerPanel.add(resetViewButton);
+        topContainerPanel.add(showAllButton);
         topContainerPanel.add(todayButton);
         topContainerPanel.add(minusZoomButton);
         topContainerPanel.add(plusZoomButton);
@@ -106,14 +100,15 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         this.setVisible(true);
     }
 
-    public void initializeComponents()throws Exception{
+    public void initializeComponents(){
         dataTable = new JTable();
         dataTable.getTableHeader().addMouseListener(this);
         dataTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         dataTable.setDefaultEditor(Object.class, null);
-        dataTable.getTableHeader().setReorderingAllowed(false);
+        dataTable.getTableHeader().setReorderingAllowed(true);
         dataTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         dataTable.setBackground(new Color(24,24,24));
+        dataTable.setFont(new Font(dataTable.getFont().getFontName(), Font.PLAIN, 30));
 
         datesTable = new JTable();
         datesTable.getTableHeader().addMouseListener(this);
@@ -198,6 +193,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         resetViewButton.setFocusable(false);
         resetViewButton.addActionListener(this);
 
+        showAllButton = new JButton("Show All");
+        showAllButton.setBackground(new Color(0, 0, 0));
+        showAllButton.setForeground(new Color(255,255,255));
+        showAllButton.setFont(BOLD_FONT);
+        showAllButton.setFocusable(false);
+        showAllButton.addActionListener(this);
+
         plusZoomButton = new JButton("+");
         plusZoomButton.setBackground(new Color(0, 0, 0));
         plusZoomButton.setForeground(new Color(255,255,255));
@@ -267,8 +269,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 row[i] = rs.getObject(i + 1);
                 if(row[i] instanceof java.sql.Date){
                     LocalDate cellDate = ((Date) row[i]).toLocalDate();
-                    String date = cellDate.format(cellDateFormat);
-                    row[i] = date;
+                    row[i] = cellDate;
                 }
             }
             dataTableModel.addRow(row);
@@ -289,7 +290,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         for(int i = 0; i < dataTable.getRowCount(); i++){
 
-            LocalDate date = LocalDate.parse(dataTable.getValueAt(i,6).toString(), cellDateFormat);
+            LocalDate date = (LocalDate)dataTable.getValueAt(i,6);
             if(date.getDayOfWeek() == DayOfWeek.SATURDAY) {
                 if(!saturdayList.contains(date)) {
                     saturdayList.add(date);
@@ -319,43 +320,66 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
     public void setTableFontsAndSizes(){
         // set both tables' fonts
-        Font font = new Font(dataTable.getTableHeader().getFont().getFontName(), Font.BOLD, dataTable.getTableHeader().getFont().getSize());
-        dataTable.getTableHeader().setFont(font);
-        datesTable.getTableHeader().setFont(font);
+        dataTable.getTableHeader().setFont(BOLD_FONT);
+        datesTable.getTableHeader().setFont(BOLD_FONT);
+        dataTable.setFont(PLAIN_FONT);
+        datesTable.setFont(PLAIN_FONT);
 
         // calculate each column width and set it as the preferred size so nothing looks cut off
         totalWidth = 0;
+        int minHeight = 0;
         for(int col = 0; col < dataTable.getColumnCount(); col++){
             TableColumn column = dataTable.getColumnModel().getColumn(col);
             TableCellRenderer headerRenderer = dataTable.getTableHeader().getDefaultRenderer();
             Component headerComp = headerRenderer.getTableCellRendererComponent(dataTable, column.getHeaderValue(), false, false, -1, col);
-            int minWidth = headerComp.getPreferredSize().width;
+
+            int minWidth = headerComp.getPreferredSize().width + (int)(8 * ZoomManager.getZoom());
+
+            if(headerComp.getPreferredSize().width > (2 * headerComp.getMinimumSize().height)){
+                column.setHeaderRenderer(new RotatedHeaderRenderer(dataTable));
+                minWidth = headerComp.getPreferredSize().height + (int)(8 * ZoomManager.getZoom());
+            }
 
             for(int i = 0; i < dataTable.getRowCount(); i++){
                 TableCellRenderer cellRenderer = dataTable.getCellRenderer(i, col);
                 Component comp = dataTable.prepareRenderer(cellRenderer, i, col);
                 int cellWidth = comp.getPreferredSize().width;
                 if(cellWidth < MAX_CELL_WIDTH)
-                    minWidth = Math.max(minWidth, cellWidth);
+                    minWidth = Math.max(minWidth, cellWidth + (int)(8 * ZoomManager.getZoom()));
             }
+
             column.setPreferredWidth(minWidth);
             column.setMaxWidth(MAX_CELL_WIDTH);
             column.setMinWidth(minWidth);
-
             totalWidth += minWidth;
+
+            int minHeadHeight = headerComp.getPreferredSize().height;
+            minHeight = Math.max(minHeight, minHeadHeight);
+
         }
         datesTable.getTableHeader().setDefaultRenderer(new RotatedHeaderRenderer(datesTable));
 
         // set datesTable cell sizes
         for (int i = 0; i < datesTable.getColumnModel().getColumnCount(); i++) {
-            datesTable.getColumnModel().getColumn(i).setMinWidth(30);
-            datesTable.getColumnModel().getColumn(i).setMaxWidth(30);
-            datesTable.getColumnModel().getColumn(i).setPreferredWidth(30);
+            datesTable.getColumnModel().getColumn(i).setMinWidth((int)(30 * ZoomManager.getZoom()));
+            datesTable.getColumnModel().getColumn(i).setMaxWidth((int)(30 * ZoomManager.getZoom()));
+            datesTable.getColumnModel().getColumn(i).setPreferredWidth((int)(30 * ZoomManager.getZoom()));
+            TableColumn column = datesTable.getColumnModel().getColumn(i);
+            TableCellRenderer headerRenderer = datesTable.getTableHeader().getDefaultRenderer();
+            Component headerComp = headerRenderer.getTableCellRendererComponent(datesTable, column.getHeaderValue(), false, false, -1, i);
+            minHeight = Math.max(minHeight, headerComp.getPreferredSize().width);
         }
 
+
+
+
         // set both tables preferred sizes
-        dataTable.getTableHeader().setPreferredSize(new Dimension(dataTable.getTableHeader().getPreferredSize().width, 100));
-        datesTable.getTableHeader().setPreferredSize(new Dimension(datesTable.getTableHeader().getPreferredSize().width, 100));
+
+        dataTable.getTableHeader().setPreferredSize(new Dimension(dataTable.getTableHeader().getPreferredSize().width, minHeight));
+        datesTable.getTableHeader().setPreferredSize(new Dimension(datesTable.getTableHeader().getPreferredSize().width, minHeight));
+
+        dataTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
+        datesTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
     }
 
     // Populate dates table with colored days
@@ -366,7 +390,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         int installIndex = 17;
         ArrayList<DateRange> dates = new ArrayList<>();
         for (int i = 0; i < datesTable.getRowCount(); i++) {
-            LocalDate dueDate = LocalDate.parse(dataTable.getValueAt(i,6).toString(), cellDateFormat);
+            LocalDate dueDate = (LocalDate)dataTable.getValueAt(i,6);
 
             // get amount of days for each section of time from data table
             int buildDays = (int) dataTable.getValueAt(i, buildIndex);
@@ -484,6 +508,29 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         }
     }
 
+    public void updateDimensions(){
+        ABSOLUTE_MIN_CELL_WIDTH = (int)(50 * ZoomManager.getZoom());
+        MAX_CELL_WIDTH = (int)(125 * ZoomManager.getZoom());
+        BASE_FONT_SIZE = (int)(15 * ZoomManager.getZoom());
+        TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
+        BUTTON_PANEL_PREF_SIZE = new Dimension(400, 100);
+        TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
+        PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
+        BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
+    }
+
+    public void refreshTable() {
+        SelectQueryBuilder qb = new SelectQueryBuilder();
+        qb.select("*");
+        qb.from("job_board");
+        qb.where("is_active = true");
+        try {
+            loadTable(database.sendSelect(qb.build()));
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == addJobButton){
@@ -544,15 +591,42 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         }
         if(e.getSource() == resetViewButton) {
             splitPane.setDividerLocation(centerPanel.getPreferredSize().width);
+            refreshTable();
+        }
+        if(e.getSource() == showAllButton) {
+            splitPane.setDividerLocation(centerPanel.getPreferredSize().width);
             SelectQueryBuilder qb = new SelectQueryBuilder();
             qb.select("*");
             qb.from("job_board");
-            qb.where("is_active = true");
+            qb.where("is_active = false");
             try {
                 loadTable(database.sendSelect(qb.build()));
             } catch (SQLException ex) {
                 ex.printStackTrace();
             }
+        }
+        if(e.getSource() == plusZoomButton) {
+            ZoomManager.increaseZoom();
+            updateDimensions();
+            //refreshTable();
+            setTableFontsAndSizes();
+
+            SwingUtilities.invokeLater(()->{
+                resetDatesScrollBar();
+            });
+
+
+            //JOptionPane.showMessageDialog(this, "current zoom: "+ZoomManager.getZoom(), "", JOptionPane.INFORMATION_MESSAGE);
+        }
+        if(e.getSource() == minusZoomButton) {
+            ZoomManager.decreaseZoom();
+            updateDimensions();
+            //refreshTable();
+            setTableFontsAndSizes();
+            SwingUtilities.invokeLater(()->{
+                resetDatesScrollBar();
+            });
+            //JOptionPane.showMessageDialog(this, "current zoom: "+ZoomManager.getZoom(), "", JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
