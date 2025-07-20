@@ -1,22 +1,43 @@
 package DatabaseInteraction;
 
 import java.io.*;
+import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.SQLOutput;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 public class PropertiesManager {
 
-    public static final String PROPERTIES_FILE_PATH = "resources/column-visibility.properties";
+    private static class PropertyConfig {
+        String filePath;
+        int keyColIndex;
+        int valueColIndex;
+        String comment;
+        public PropertyConfig(String filePath, int keyColIndex, int valueColIndex, String comment){
+            this.filePath = filePath;
+            this.keyColIndex = keyColIndex;
+            this.valueColIndex = valueColIndex;
+            this.comment = comment;
+        }
+    }
+
+    public static final String VISIBILITY_PROPERTIES_FILE_PATH = "resources/column-visibility.properties";
+    public static final String CELL_DROPDOWN_PROPERTIES_FILE_PATH = "resources/cell-column-dropdown.properties";
+    public static final String CELL_EDITABLE_PROPERTIES_FILE_PATH = "resources/cell-column-editable.properties";
+    public static final String MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH = "resources/menu-column-dropdown.properties";
+    public static final String MENU_COLUMN_EDITABLE_PROPERTIES_FILE_PATH = "resources/menu-column-editable.properties";
+    public static final String USER_PREF_PROPERTIES_FILE_PATH = "resources/user-preferences.properties";
+
+    private static ResultSet resultSet;
 
     public static ArrayList<Boolean> ReadColumnVisibility(ArrayList<String> columnNames){
         Properties props = new Properties();
         ArrayList<Boolean> columnVisible = new ArrayList<>();
         try{
-            InputStream input = PropertiesManager.class.getClassLoader().getResourceAsStream(PROPERTIES_FILE_PATH);
+            InputStream input = PropertiesManager.class.getClassLoader().getResourceAsStream(VISIBILITY_PROPERTIES_FILE_PATH);
             props.load(input);
 
             for(String s : columnNames){
@@ -44,40 +65,62 @@ public class PropertiesManager {
         Properties props = new Properties();
     }
 
-    public static void checkColumns() throws Exception{
-
+    public static void queryPermissions(){
         DatabaseInteraction database = new DatabaseInteraction();
         SelectQueryBuilder qb = new SelectQueryBuilder();
         qb.select("*");
-        qb.from("job_board");
+        qb.from("column_permissions");
+        resultSet = database.sendSelect(qb.build());
+    }
 
-        Properties props = new Properties();
-        InputStream input = new FileInputStream(PROPERTIES_FILE_PATH);
-        props.load(input);
+    public static void loadColumnPermissions() throws Exception{
+        ResultSetMetaData rsMeta = resultSet.getMetaData();
 
-        boolean propertiesChanged = false;
+        int columnNameCol = resultSet.findColumn("column_name");
+        int isVisibleCol = resultSet.findColumn("is_visible");
+        int hasDropdownCol = resultSet.findColumn("has_dropdown");
+        int cellsEditableCol = resultSet.findColumn("cells_editable");
+        int menuHasDropdownCol = resultSet.findColumn("menu_column_has_dropdown");
+        int menuEditableCol = resultSet.findColumn("menu_column_editable");
 
-        ResultSet rs = database.sendSelect(qb.build());
-        ResultSetMetaData rsMeta = rs.getMetaData();
-        for(int i = 1; i <= rsMeta.getColumnCount(); i++){
-            String colName = rsMeta.getColumnName(i);
-            if(!props.containsKey(colName)){
-                props.setProperty(colName, "true");
-                propertiesChanged = true;
-                System.out.println("property set");
+        List<PropertyConfig> configs = Arrays.asList(
+                new PropertyConfig(VISIBILITY_PROPERTIES_FILE_PATH, columnNameCol, isVisibleCol, "Column Visibility Properties"),
+                new PropertyConfig(CELL_DROPDOWN_PROPERTIES_FILE_PATH, columnNameCol, hasDropdownCol, "Cell Dropdown Properties"),
+                new PropertyConfig(CELL_EDITABLE_PROPERTIES_FILE_PATH, columnNameCol, cellsEditableCol, "Cell Editable Properties"),
+                new PropertyConfig(MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH, columnNameCol, menuHasDropdownCol, "Menu Column Dropdown Properties"),
+                new PropertyConfig(MENU_COLUMN_EDITABLE_PROPERTIES_FILE_PATH, columnNameCol, menuEditableCol, "Menu Column Editable Properties")
+        );
+
+
+        for(PropertyConfig config : configs){
+            Properties props = new Properties();
+            FileInputStream input = new FileInputStream(config.filePath);
+            boolean propertiesChanged = false;
+            props.load(input);
+
+            resultSet.beforeFirst();
+            while(resultSet.next()){
+                String key = resultSet.getString(config.keyColIndex);
+                String value = resultSet.getString(config.valueColIndex);
+                if(!value.equals(props.getProperty(key))){
+                    props.setProperty(key, value);
+                    propertiesChanged = true;
+                }
+            }
+            input.close();
+            if(propertiesChanged){
+                OutputStream output = new FileOutputStream(config.filePath);
+                props.store(output, config.comment);
+                System.out.println("Updated: "+config.filePath);
+                output.close();
             }
         }
 
-        if(propertiesChanged){
-            OutputStream output = new FileOutputStream(PROPERTIES_FILE_PATH);
-            props.store(output, "column visibility properties");
-            System.out.println("properties added");
-        }
     }
 
     public static String[] getColumnOrder() {
         Properties prop = new Properties();
-        try(FileInputStream input = new FileInputStream(PropertiesManager.PROPERTIES_FILE_PATH)){
+        try(FileInputStream input = new FileInputStream(PropertiesManager.VISIBILITY_PROPERTIES_FILE_PATH)){
             prop.load(input);
 
             String columnOrderString = prop.getProperty("column.order");
@@ -92,10 +135,10 @@ public class PropertiesManager {
     public static String getKeyValue(String key){
         Properties prop = new Properties();
         String value = "true";
-        try(FileInputStream input = new FileInputStream(PropertiesManager.PROPERTIES_FILE_PATH)){
+        try(FileInputStream input = new FileInputStream(PropertiesManager.VISIBILITY_PROPERTIES_FILE_PATH)){
             prop.load(input);
             value = prop.getProperty(key);
-            System.out.println(value);
+            //System.out.println(key+": "+value);
             return value;
         } catch (IOException e){
             e.printStackTrace();

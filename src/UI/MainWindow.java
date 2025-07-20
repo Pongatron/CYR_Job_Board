@@ -11,6 +11,7 @@ import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.*;
 import java.time.DayOfWeek;
@@ -261,32 +262,39 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     public void createDataTable() throws SQLException{
         //---------- create datatable
         ResultSetMetaData rsMeta = resultSet.getMetaData();
-
-
         int colCount = rsMeta.getColumnCount();
-        String[] columnOrder = PropertiesManager.getColumnOrder();
+
+        ArrayList<Integer> visibleIndexes = new ArrayList<>();
 
         for (int i = 1; i <= colCount; i++) {
             String columnName = rsMeta.getColumnLabel(i);
-            if(PropertiesManager.getKeyValue(columnName).equals("true")) {
-                columnName = columnName.replace("_", " ");
-                dataTableModel.addColumn(columnName);
+            if(PropertiesManager.getKeyValue(columnName).equals("t")) {
+                System.out.println(columnName+": "+i);
+                visibleIndexes.add(i);
+                dataTableModel.addColumn(columnName.replace("_", " "));
             }
         }
 
-        Object[] row = new Object[colCount];
-        Object[] emptyRow = new Object[colCount];
+
         while (resultSet.next()) {
-            for (int i = 0; i < colCount; i++) {
-                row[i] = resultSet.getObject(i + 1);
-                if(row[i] instanceof java.sql.Date){
-                    LocalDate cellDate = ((Date) row[i]).toLocalDate();
+            Object[] row = new Object[visibleIndexes.size()];
+            Object[] emptyRow = new Object[visibleIndexes.size()];
+
+            for (int i = 0; i < visibleIndexes.size(); i++) {
+                int databaseIndex = visibleIndexes.get(i);
+                Object item = resultSet.getObject(databaseIndex);
+                if (item instanceof java.sql.Date) {
+                    LocalDate cellDate = ((Date) item).toLocalDate();
                     row[i] = cellDate;
+                }
+                else{
+                    row[i] = item;
                 }
             }
             dataTableModel.addRow(row);
             datesTableModel.addRow(emptyRow);
         }
+        resultSet.beforeFirst();
 
         dataTable.setModel(dataTableModel);
         //-------------------
@@ -304,7 +312,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         while(resultSet.next()){
             Date sqlDate = resultSet.getDate("due_date");
             LocalDate date = sqlDate.toLocalDate();
-            System.out.println(date);
             if(date.getDayOfWeek() == DayOfWeek.SATURDAY) {
                 if(!saturdayList.contains(date)) {
                     saturdayList.add(date);
@@ -312,17 +319,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             }
         }
         resultSet.beforeFirst();
-
-//        TableColumn dueDateColumn = getColumnByName(dataTable, "due date");
-//        for(int i = 0; i < dataTable.getRowCount(); i++){
-//
-//            LocalDate date = (LocalDate)dataTable.getValueAt(i, dueDateColumn.getModelIndex());
-//            if(date.getDayOfWeek() == DayOfWeek.SATURDAY) {
-//                if(!saturdayList.contains(date)) {
-//                    saturdayList.add(date);
-//                }
-//            }
-//        }
 
         while(!currentDate.isAfter(oneYearFromNow)){
             if(currentDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
@@ -411,19 +407,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         datesTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
     }
 
-//    public TableColumn getColumnByName(JTable table, String name){
-//        TableColumnModel columnModel = table.getColumnModel();
-//
-//        for(int i = 0; i < columnModel.getColumnCount(); i++){
-//            TableColumn column = columnModel.getColumn(i);
-//            Object headerValue = column.getHeaderValue();
-//            if(headerValue != null && headerValue.toString().equals(name)){
-//                return column;
-//            }
-//        }
-//        return null;
-//    }
-
     // Populate dates table with colored days
     public void populateDatesTable() throws SQLException {
         // TODO find a way to get column index without exact number
@@ -434,7 +417,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         int finishIndex = 1;
         int installIndex = 1;
         int dueDateColumn = 1;
-        while(resultSet.next()){System.out.println("anything");
+        while(resultSet.next()){
             buildIndex = resultSet.findColumn("build");
             finishIndex = resultSet.findColumn("finish");
             installIndex = resultSet.findColumn("install");
@@ -523,7 +506,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 }
                 tempDatePopulator = tempDatePopulator.plusDays(1);
             }
-            System.out.println("anything");
             dates.add(new DateRange(dueDate, buildDates, finishDates, installDates, isDueDateSaturday));
         }
         resultSet.beforeFirst();
@@ -574,28 +556,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
     public void refreshTable() {
         SelectQueryBuilder qb = new SelectQueryBuilder();
-
-//        Properties prop = new Properties();
-//        try(FileInputStream input = new FileInputStream(PropertiesManager.PROPERTIES_FILE_PATH)){
-//            prop.load(input);
-//
-//            String columnOrderString = prop.getProperty("column.order");
-//            String[] orderedColumnNames = columnOrderString.split(",");
-//            for(String s : orderedColumnNames){
-//                if(prop.containsKey(s)){
-//                    if(prop.getProperty(s).equals("true")) {
-//                        qb.select(s);
-//                    }
-//                }
-//            }
-//
-//        } catch (IOException e){
-//            e.printStackTrace();
-//        }
-
         qb.select("*");
-
-
         qb.from("job_board");
         qb.where("is_active = true");
         try {
@@ -604,6 +565,10 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    public void createDropdown(String columnName){
+
     }
 
     @Override
