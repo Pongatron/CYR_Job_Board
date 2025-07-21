@@ -34,6 +34,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private static  Dimension TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
     private static  Font PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
     private static  Font BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
+    private static  Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 15);
 
     private final DatabaseInteraction database;
     private ResultSet resultSet;
@@ -57,7 +58,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JTable datesTable;
     private JSplitPane splitPane;
     private JToolBar mainBar;
-    private int totalWidth;
+    public static int totalWidth;
     private int todayCol = -1;
 
     DefaultTableModel dataTableModel;
@@ -66,9 +67,9 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     public MainWindow() throws Exception{
 
         database = new DatabaseInteraction();
+        updateDimensions();
         initializeComponents();
         syncScrollPanes();
-
         refreshTable();
 
         buttonPanel.add(addJobButton);
@@ -92,10 +93,18 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         centerPanel.setPreferredSize(new Dimension(totalWidth, 200));
         centerPanel.add(tableScroll, BorderLayout.CENTER);
-        splitPane.setDividerLocation(centerPanel.getPreferredSize().width);
+        setDividerLocation();
 
         this.add(mainBar, BorderLayout.NORTH);
         this.add(splitPane, BorderLayout.CENTER);
+
+        this.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                PropertiesManager.saveUserPreferences();
+                super.windowClosing(e);
+            }
+        });
 
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setTitle("Job Board");
@@ -147,77 +156,77 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         addJobButton = new JButton("Add Job");
         addJobButton.setBackground(new Color(220, 46, 35));
         addJobButton.setForeground(new Color(0,0,0));
-        addJobButton.setFont(BOLD_FONT);
+        addJobButton.setFont(BUTTON_FONT);
         addJobButton.setFocusable(false);
         addJobButton.addActionListener(this);
 
         updateJobButton = new JButton("Update");
         updateJobButton.setBackground(new Color(0, 52, 191));
         updateJobButton.setForeground(new Color(255,255,255));
-        updateJobButton.setFont(BOLD_FONT);
+        updateJobButton.setFont(BUTTON_FONT);
         updateJobButton.setFocusable(false);
         updateJobButton.addActionListener(this);
 
         deleteButton = new JButton("Delete");
         deleteButton.setBackground(new Color(240, 232, 5));
         deleteButton.setForeground(new Color(0,0,0));
-        deleteButton.setFont(BOLD_FONT);
+        deleteButton.setFont(BUTTON_FONT);
         deleteButton.setFocusable(false);
         deleteButton.addActionListener(this);
 
         jwoFilterButton = new JButton("JWO");
         jwoFilterButton.setBackground(new Color(44, 123, 201));
         jwoFilterButton.setForeground(new Color(255,255,255));
-        jwoFilterButton.setFont(BOLD_FONT);
+        jwoFilterButton.setFont(BUTTON_FONT);
         jwoFilterButton.setFocusable(false);
         jwoFilterButton.addActionListener(this);
 
         customerFilterButton = new JButton("Customer");
         customerFilterButton.setBackground(new Color(44, 123, 201));
         customerFilterButton.setForeground(new Color(255,255,255));
-        customerFilterButton.setFont(BOLD_FONT);
+        customerFilterButton.setFont(BUTTON_FONT);
         customerFilterButton.setFocusable(false);
         customerFilterButton.addActionListener(this);
 
         dateFilterButton = new JButton("Due Date");
         dateFilterButton.setBackground(new Color(44, 123, 201));
         dateFilterButton.setForeground(new Color(255,255,255));
-        dateFilterButton.setFont(BOLD_FONT);
+        dateFilterButton.setFont(BUTTON_FONT);
         dateFilterButton.setFocusable(false);
         dateFilterButton.addActionListener(this);
 
         todayButton = new JButton("Today");
         todayButton.setBackground(new Color(0, 0, 0));
         todayButton.setForeground(new Color(255,255,255));
-        todayButton.setFont(BOLD_FONT);
+        todayButton.setFont(BUTTON_FONT);
         todayButton.setFocusable(false);
         todayButton.addActionListener(this);
 
         resetViewButton = new JButton("Reset View");
         resetViewButton.setBackground(new Color(0, 0, 0));
         resetViewButton.setForeground(new Color(255,255,255));
-        resetViewButton.setFont(BOLD_FONT);
+        resetViewButton.setFont(BUTTON_FONT);
         resetViewButton.setFocusable(false);
         resetViewButton.addActionListener(this);
 
         archiveButton = new JButton("Archive");
         archiveButton.setBackground(new Color(0, 0, 0));
         archiveButton.setForeground(new Color(255,255,255));
-        archiveButton.setFont(BOLD_FONT);
+        archiveButton.setFont(BUTTON_FONT);
         archiveButton.setFocusable(false);
         archiveButton.addActionListener(this);
 
         plusZoomButton = new JButton("+");
         plusZoomButton.setBackground(new Color(0, 0, 0));
         plusZoomButton.setForeground(new Color(255,255,255));
-        plusZoomButton.setFont(BOLD_FONT);
+        plusZoomButton.setFont(BUTTON_FONT);
         plusZoomButton.setFocusable(false);
         plusZoomButton.addActionListener(this);
 
         minusZoomButton = new JButton("-");
         minusZoomButton.setBackground(new Color(0, 0, 0));
         minusZoomButton.setForeground(new Color(255,255,255));
-        minusZoomButton.setFont(BOLD_FONT);
+        minusZoomButton.setFont(BUTTON_FONT);
         minusZoomButton.setFocusable(false);
         minusZoomButton.addActionListener(this);
 
@@ -242,6 +251,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         datesScroll.getHorizontalScrollBar().setBackground(new Color(24,24,24));
 
         splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, centerPanel,datesScroll);
+        splitPane.setDividerSize(5);
+        splitPane.setBorder(null);
 
         TableCustom.apply(tableScroll, TableCustom.TableType.DEFAULT);
         TableCustom.apply(datesScroll, TableCustom.TableType.VERTICAL);
@@ -331,9 +342,14 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 }
                 else
                     datesTableModel.addColumn(currentDate.format(dateFormat));
-                if (currentDate.equals(today))
-                    todayCol = datesTableModel.getColumnCount() - 1;
             }
+            if(currentDate.isEqual(today)){
+                datesTableModel.addColumn(currentDate.format(dateFormat));
+                todayCol = datesTableModel.getColumnCount() - 1;
+            }
+            System.out.println(currentDate);
+            System.out.println(today);
+
             currentDate = currentDate.plusDays(1);
         }
         datesTable.setModel(datesTableModel);
@@ -571,6 +587,10 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
     }
 
+    public void setDividerLocation(){
+        splitPane.setDividerLocation(totalWidth);
+    }
+
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == addJobButton){
@@ -633,12 +653,12 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             resetDatesScrollBar();
         }
         if(e.getSource() == resetViewButton) {
-            splitPane.setDividerLocation(centerPanel.getPreferredSize().width);
+            setDividerLocation();
             dataTable.setSelectionModel(new DefaultListSelectionModel());
             refreshTable();
         }
         if(e.getSource() == archiveButton) {
-            splitPane.setDividerLocation(centerPanel.getPreferredSize().width);
+            setDividerLocation();
             SelectQueryBuilder qb = new SelectQueryBuilder();
             qb.select("*");
             qb.from("job_board");
@@ -672,6 +692,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             updateDimensions();
             //refreshTable();
             setTableFontsAndSizes();
+            setDividerLocation();
 
             SwingUtilities.invokeLater(()->{
                 setTableFontsAndSizes();
@@ -686,6 +707,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             updateDimensions();
             //refreshTable();
             setTableFontsAndSizes();
+            setDividerLocation();
+
             SwingUtilities.invokeLater(()->{
                 setTableFontsAndSizes();
                 resetDatesScrollBar();
