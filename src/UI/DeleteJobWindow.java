@@ -13,6 +13,7 @@ import java.sql.SQLException;
 
 public class DeleteJobWindow extends JFrame implements ActionListener {
 
+    private static  Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 15);
     private static final String DELETE_PASSWORD = "password";
     private DatabaseInteraction database;
     private JPanel topPanel;
@@ -78,12 +79,20 @@ public class DeleteJobWindow extends JFrame implements ActionListener {
         buttonsPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 10));
         buttonsPanel.setBackground(new Color(40,40,40));
 
-        deleteJobButton = new JButton("Delete Job");
+        deleteJobButton = new JButton("Delete");
         deleteJobButton.setPreferredSize(new Dimension(100,40));
+        deleteJobButton.setBackground(new Color(0, 0, 0));
+        deleteJobButton.setForeground(new Color(255,255,255));
+        deleteJobButton.setFont(BUTTON_FONT);
+        deleteJobButton.setFocusable(false);
         deleteJobButton.addActionListener(this);
 
         cancelButton = new JButton("Cancel");
         cancelButton.setPreferredSize(new Dimension(100,40));
+        cancelButton.setBackground(new Color(0, 0, 0));
+        cancelButton.setForeground(new Color(255,255,255));
+        cancelButton.setFont(BUTTON_FONT);
+        cancelButton.setFocusable(false);
         cancelButton.addActionListener(this);
 
     }
@@ -159,9 +168,11 @@ public class DeleteJobWindow extends JFrame implements ActionListener {
                 qb.where("is_active = true");
                 try {
                     database.sendUpdate(qb.build());
+                    JOptionPane.showMessageDialog(this, "Job sent to Archive");
                 } catch (SQLException ex) {
                     ex.printStackTrace();
                 }
+
                 dispose();
             }
         }

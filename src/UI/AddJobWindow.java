@@ -8,17 +8,15 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.util.Properties;
-import java.util.Set;
 
 public class AddJobWindow extends JFrame implements ActionListener {
 
+    private static  Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 15);
     private DatabaseInteraction database;
     private ResultSet jobBoardResultSet;
     private ArrayList<JPanel> fields;
@@ -27,7 +25,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
     private JPanel fieldsPanel;
     private JPanel buttonsPanel;
     private JButton createButton;
-    private JButton resetButton;
+    private JButton cancelButton;
     private ArrayList<String> requiredCols;
 
     public AddJobWindow(DatabaseInteraction db, ResultSet rs){
@@ -48,7 +46,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
         topPanel.add(headingText);
 
         buttonsPanel.add(createButton);
-        buttonsPanel.add(resetButton);
+        buttonsPanel.add(cancelButton);
 
         centerPanel.add(topPanel);
         centerPanel.add(Box.createVerticalStrut(10));
@@ -89,11 +87,19 @@ public class AddJobWindow extends JFrame implements ActionListener {
 
         createButton = new JButton("Create");
         createButton.setPreferredSize(new Dimension(100,40));
+        createButton.setBackground(new Color(0, 0, 0));
+        createButton.setForeground(new Color(255,255,255));
+        createButton.setFont(BUTTON_FONT);
+        createButton.setFocusable(false);
         createButton.addActionListener(this);
 
-        resetButton = new JButton("Reset");
-        resetButton.setPreferredSize(new Dimension(100,40));
-        resetButton.addActionListener(this);
+        cancelButton = new JButton("Cancel");
+        cancelButton.setPreferredSize(new Dimension(100,40));
+        cancelButton.setBackground(new Color(0, 0, 0));
+        cancelButton.setForeground(new Color(255,255,255));
+        cancelButton.setFont(BUTTON_FONT);
+        cancelButton.setFocusable(false);
+        cancelButton.addActionListener(this);
 
         fields = new ArrayList<>();
     }
@@ -110,25 +116,68 @@ public class AddJobWindow extends JFrame implements ActionListener {
         FileInputStream visibleInput = new FileInputStream(PropertiesManager.MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH);
         visibleProps.load(visibleInput);
 
+        Properties dropdownProps = new Properties();
+        FileInputStream dropdownInput = new FileInputStream(PropertiesManager.MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH);
+        dropdownProps.load(dropdownInput);
+
+        Properties dropdownListProps = new Properties();
+        FileInputStream dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+        dropdownListProps.load(dropdownListInput);
+
         for(String columnName : colOrder){
             String requiredValue = requiredProps.getProperty(columnName);
             String visibleValue = visibleProps.getProperty(columnName);
+            String dropdownValue = dropdownProps.getProperty(columnName);
             if("t".equals(visibleValue)){
                 if("t".equals(requiredValue)){
                     requiredCols.add(columnName);
                     columnName += "*";
                 }
                 JLabel label = new JLabel(columnName);
-                label.setForeground(Color.white);
+//                if(columnName.contains("*"))
+//                    label.setForeground(new Color(255, 50,50));
+//                else
+                    label.setForeground(Color.white);
                 label.setFont(new Font("SansSerif", Font.BOLD, 20));
 
-                JTextField text = new JTextField();
-                text.setPreferredSize(new Dimension(200, 30));
-                text.setCaretColor(Color.white);
-                text.setBackground(new Color(60, 60, 60));
-                text.setForeground(Color.WHITE);
-                text.setFont(new Font("SansSerif", Font.PLAIN, 20));
-                text.setBorder(new EmptyBorder(5,5,5,5));
+                JComponent text;
+                if("t".equals(dropdownValue)){
+                    String dropdownList = dropdownListProps.getProperty(columnName.replace("*", "") + "_list.dropdown.options");
+                    if(dropdownList == null)
+                        dropdownList = ",none";
+
+                    JComboBox comboBox = new JComboBox<>(dropdownList.split(","));
+                    Component editorComp = comboBox.getEditor().getEditorComponent();
+
+                    if(editorComp instanceof JTextField textField){
+                        textField.setPreferredSize(new Dimension(200, 30));
+                        textField.setCaretColor(Color.white);
+                        textField.setBackground(new Color(60, 60, 60));
+                        textField.setForeground(Color.WHITE);
+                        textField.setFont(new Font("SansSerif", Font.PLAIN, 20));
+                        textField.setBorder(new EmptyBorder(0,0,0,0));
+                    }
+
+                    comboBox.setPreferredSize(new Dimension(200, 30));
+                    comboBox.setEditable(true);
+                    comboBox.setBackground(new Color(60, 60, 60));
+                    comboBox.setForeground(Color.WHITE);
+                    comboBox.setFont(new Font("SansSerif", Font.PLAIN, 20));
+                    comboBox.setBorder(new EmptyBorder(5, 5, 5, 5));
+                    comboBox.setMaximumRowCount(5);
+
+                    text = comboBox;
+                }
+                else {
+                    JTextField textField = new JTextField();
+                    textField.setPreferredSize(new Dimension(200, 30));
+                    textField.setCaretColor(Color.white);
+                    textField.setBackground(new Color(60, 60, 60));
+                    textField.setForeground(Color.WHITE);
+                    textField.setFont(new Font("SansSerif", Font.PLAIN, 20));
+                    textField.setBorder(new EmptyBorder(5, 5, 5, 5));
+                    text = textField;
+                }
 
                 JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
                 panel.setBackground(new Color(40, 40, 40));
@@ -153,8 +202,15 @@ public class AddJobWindow extends JFrame implements ActionListener {
             for(JPanel p : fields){
                 JLabel label = (JLabel) p.getComponent(0);
                 String labelText = label.getText().replace("*", "");
-                JTextField text = (JTextField) p.getComponent(1);
-                String str = text.getText();
+                Component text =  p.getComponent(1);
+                String str = "OLD";
+                if(text instanceof JComboBox<?> comboBox){
+                    str = comboBox.getEditor().getItem().toString();
+                }
+                else if(text instanceof JTextField textField){
+                    str = textField.getText();
+                }
+
 
                 boolean isRequired = requiredCols.contains(labelText);
 
@@ -182,7 +238,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
                 }
                 else
                     JOptionPane.showMessageDialog(null, "You have empty required values: "+missingFields, null, JOptionPane.INFORMATION_MESSAGE);
-            } catch (SQLException ex) {
+            } catch (Exception ex) {
                 ex.printStackTrace();
                 String userMessage = ex.getMessage();
                 if(userMessage.toLowerCase().contains("duplicate") && userMessage.toLowerCase().contains("key")){
@@ -194,11 +250,8 @@ public class AddJobWindow extends JFrame implements ActionListener {
                 database.closeResources();
             }
         }
-        if(e.getSource() == resetButton){
-            for(JPanel p : fields){
-                JTextField textField = (JTextField) p.getComponent(1);
-                textField.setText(null);
-            }
+        if(e.getSource() == cancelButton){
+            dispose();
         }
     }
 }

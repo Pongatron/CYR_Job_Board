@@ -6,6 +6,7 @@ import java.io.*;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -20,6 +21,7 @@ public class PropertiesManager {
     public static final String MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH = "resources/menu-column-visible.properties";
     public static final String COLUMN_REQUIRED_PROPERTIES_FILE_PATH = "resources/column-required.properties";
     public static final String USER_PREF_PROPERTIES_FILE_PATH = "resources/user-preferences.properties";
+    public static final String DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH = "resources/dropdown-options.properties";
     private static ResultSet resultSet;
 
     private static class PropertyConfig {
@@ -61,10 +63,6 @@ public class PropertiesManager {
             e.printStackTrace();
         }
         return columnVisible;
-    }
-
-    public static void WriteProperty(){
-        Properties props = new Properties();
     }
 
     public static void queryPermissions(){
@@ -117,6 +115,49 @@ public class PropertiesManager {
                 output.close();
             }
         }
+    }
+
+    public static void loadColumnDropdowns() throws IOException, SQLException {
+        Properties cellDropProps = new Properties();
+        FileInputStream cellDropInput = new FileInputStream(CELL_DROPDOWN_PROPERTIES_FILE_PATH);
+        cellDropProps.load(cellDropInput);
+
+        Properties menuDropProps = new Properties();
+        FileInputStream menuDropInput = new FileInputStream(MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH);
+        menuDropProps.load(menuDropInput);
+
+        Properties dropdownOptionProps = new Properties();
+        FileInputStream dropdownOptionInput = new FileInputStream(DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+        dropdownOptionProps.load(dropdownOptionInput);
+
+        String[] colOrder = getColumnOrder();
+
+        DatabaseInteraction database = new DatabaseInteraction();
+        ResultSet rsTables = database.sendSelect("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'");
+        ArrayList<String> dropdownTablesList = new ArrayList<>();
+        while(rsTables.next()){
+            String tableName = rsTables.getString(1);
+            if(tableName.contains("list")){
+                System.out.println(tableName);
+                dropdownTablesList.add(tableName);
+            }
+        }
+
+        for(String tableName : dropdownTablesList){
+            SelectQueryBuilder qb = new SelectQueryBuilder();
+            qb.select("*");
+            qb.from(tableName);
+            ResultSet rs = database.sendSelect(qb.build());
+
+            String dropdownOptions = "";
+            while(rs.next()){
+                dropdownOptions += "," + rs.getString(1) ;
+            }
+            dropdownOptionProps.setProperty(tableName+".dropdown.options", dropdownOptions);
+        }
+
+        OutputStream output = new FileOutputStream(DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+        dropdownOptionProps.store(output, "Dropdown Options Lists");
     }
 
     public static void loadUserPreferences(){

@@ -5,6 +5,7 @@ import DatabaseInteraction.*;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
+import javax.swing.plaf.basic.ComboPopup;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -19,6 +20,7 @@ import java.util.Properties;
 
 public class UpdateJobWindow extends JFrame implements ActionListener {
 
+    private static  Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 15);
     private DatabaseInteraction database;
     private ResultSet jobBoardResultSet;
     private ArrayList<JPanel> fields;
@@ -27,8 +29,9 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
     private JPanel fieldsPanel;
     private JPanel buttonsPanel;
     private JButton updateButton;
-    private JButton resetButton;
+    private JButton cancelButton;
     private String selectedJwo;
+    ArrayList<String> requiredCols;
     private static final Color UPDATE_PANEL_COLOR = new Color(40, 40, 40);
 
     public UpdateJobWindow(DatabaseInteraction db, ResultSet rs,String jwo){
@@ -48,7 +51,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
         topPanel.add(headingText);
 
         buttonsPanel.add(updateButton);
-        buttonsPanel.add(resetButton);
+        buttonsPanel.add(cancelButton);
 
         centerPanel.add(topPanel);
         centerPanel.add(Box.createVerticalStrut(10));
@@ -89,11 +92,19 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
 
         updateButton = new JButton("Update");
         updateButton.setPreferredSize(new Dimension(100,40));
+        updateButton.setBackground(new Color(0, 0, 0));
+        updateButton.setForeground(new Color(255,255,255));
+        updateButton.setFont(BUTTON_FONT);
+        updateButton.setFocusable(false);
         updateButton.addActionListener(this);
 
-        resetButton = new JButton("Reset");
-        resetButton.setPreferredSize(new Dimension(100,40));
-        resetButton.addActionListener(this);
+        cancelButton = new JButton("Cancel");
+        cancelButton.setPreferredSize(new Dimension(100,40));
+        cancelButton.setBackground(new Color(0, 0, 0));
+        cancelButton.setForeground(new Color(255,255,255));
+        cancelButton.setFont(BUTTON_FONT);
+        cancelButton.setFocusable(false);
+        cancelButton.addActionListener(this);
 
         fields = new ArrayList<>();
     }
@@ -101,7 +112,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
     private void addFields() throws IOException, SQLException {
 
         jobBoardResultSet.beforeFirst();
-        ArrayList<String> requiredCols = new ArrayList<>();
+        requiredCols = new ArrayList<>();
         String[] colOrder = PropertiesManager.getColumnOrder();
 
         Properties requiredProps = new Properties();
@@ -111,54 +122,96 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
         Properties visibleProps = new Properties();
         FileInputStream visibleInput = new FileInputStream(PropertiesManager.MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH);
         visibleProps.load(visibleInput);
+
+        Properties dropdownProps = new Properties();
+        FileInputStream dropdownInput = new FileInputStream(PropertiesManager.MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH);
+        dropdownProps.load(dropdownInput);
+
+        Properties dropdownListProps = new Properties();
+        FileInputStream dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+        dropdownListProps.load(dropdownListInput);
+
         ResultSetMetaData rsMeta = null;
-
         while(jobBoardResultSet.next()) {
-            if(!jobBoardResultSet.getObject("jwo").toString().equals(selectedJwo)){
-                System.out.println("matching jwo");
-                continue;
+            if (jobBoardResultSet.getObject("jwo").toString().equals(selectedJwo)) {
+                break;
             }
+        }
 
-            try {
-                rsMeta = jobBoardResultSet.getMetaData();
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
+        for(String columnName : colOrder){
+            String requiredValue = requiredProps.getProperty(columnName);
+            String visibleValue = visibleProps.getProperty(columnName);
+            String dropdownValue = dropdownProps.getProperty(columnName);
+            if("t".equals(visibleValue)){
+                if("t".equals(requiredValue)){
+                    requiredCols.add(columnName);
+                    columnName += "*";
+                }
+                JLabel label = new JLabel(columnName);
+//                if(columnName.contains("*"))
+//                    label.setForeground(new Color(255, 50,50));
+//                else
+                label.setForeground(Color.white);
+                label.setFont(new Font("SansSerif", Font.BOLD, 20));
 
+                JComponent text;
+                if("t".equals(dropdownValue)){
+                    String dropdownList = dropdownListProps.getProperty(columnName.replace("*", "") + "_list.dropdown.options");
+                    if(dropdownList == null)
+                        dropdownList = ",none";
 
-            for (String columnName : colOrder) {
-                String requiredValue = requiredProps.getProperty(columnName);
-                String visibleValue = visibleProps.getProperty(columnName);
-                String requiredColName = columnName;
-                if ("t".equals(visibleValue)) {
-                    if ("t".equals(requiredValue)) {
-                        requiredColName += "*";
-                        requiredCols.add(columnName);
+                    JComboBox comboBox = new JComboBox<>(dropdownList.split(","));
+                    Component editorComp = comboBox.getEditor().getEditorComponent();
+
+                    if(editorComp instanceof JTextField textField){
+                        textField.setPreferredSize(new Dimension(200, 30));
+                        textField.setCaretColor(Color.white);
+                        textField.setBackground(new Color(60, 60, 60));
+                        textField.setForeground(Color.WHITE);
+                        textField.setFont(new Font("SansSerif", Font.PLAIN, 20));
+                        textField.setBorder(new EmptyBorder(0,0,0,0));
                     }
-                    JLabel label = new JLabel(requiredColName);
-                    label.setForeground(Color.white);
-                    label.setFont(new Font("SansSerif", Font.BOLD, 20));
 
-                    JTextField text = new JTextField();
-                    text.setPreferredSize(new Dimension(200, 30));
-                    text.setCaretColor(Color.white);
-                    text.setBackground(new Color(60, 60, 60));
-                    text.setForeground(Color.WHITE);
-                    text.setFont(new Font("SansSerif", Font.PLAIN, 20));
-                    text.setBorder(new EmptyBorder(5, 5, 5, 5));
+                    comboBox.setPreferredSize(new Dimension(200, 30));
+                    comboBox.setEditable(true);
+                    comboBox.setBackground(new Color(60, 60, 60));
+                    comboBox.setForeground(Color.WHITE);
+                    comboBox.setFont(new Font("SansSerif", Font.PLAIN, 20));
+                    comboBox.setBorder(new EmptyBorder(5, 5, 5, 5));
+                    comboBox.setMaximumRowCount(5);
 
-                    JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
-                    panel.setBackground(new Color(40, 40, 40));
-                    panel.add(label);
-                    panel.add(text);
-                    fields.add(panel);
-                    fieldsPanel.add(panel);
-                    int databaseColIndex = jobBoardResultSet.findColumn(columnName);
-                    Object value = jobBoardResultSet.getObject(databaseColIndex);
-                    text.setText(value != null ? value.toString() : "");
+                    text = comboBox;
+                }
+                else {
+                    JTextField textField = new JTextField();
+                    textField.setPreferredSize(new Dimension(200, 30));
+                    textField.setCaretColor(Color.white);
+                    textField.setBackground(new Color(60, 60, 60));
+                    textField.setForeground(Color.WHITE);
+                    textField.setFont(new Font("SansSerif", Font.PLAIN, 20));
+                    textField.setBorder(new EmptyBorder(5, 5, 5, 5));
+                    text = textField;
+                }
+
+                JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+                panel.setBackground(new Color(40, 40, 40));
+                panel.add(label);
+                panel.add(text);
+                fields.add(panel);
+                fieldsPanel.add(panel);
+
+                int databaseColIndex = jobBoardResultSet.findColumn(columnName.replace("*", ""));
+                Object value = jobBoardResultSet.getObject(databaseColIndex);
+
+                if(text instanceof JComboBox<?> comboBox){
+                    comboBox.setSelectedItem(value != null ? value.toString() : "");
+                }
+                else if(text instanceof JTextField textField){
+                    textField.setText(value != null ? value.toString() : "");
                 }
             }
         }
+        database.closeResources();
     }
 
     @Override
@@ -166,30 +219,63 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
         if(e.getSource() == updateButton){
             UpdateQueryBuilder qb = new UpdateQueryBuilder();
             qb.updateTable("job_board");
+            boolean notEmpty = true;
+            String missingFields = "";
             for(JPanel p : fields){
                 JLabel label = (JLabel) p.getComponent(0);
-                JTextField textField = (JTextField) p.getComponent(1);
-                if(!textField.getText().isBlank()){
-                    qb.setColNames(label.getText().replace("*", ""));
-                    qb.setValues(textField.getText());
+                String labelText = label.getText().replace("*", "");
+                Component text =  p.getComponent(1);
+                String str = "OLD";
+                if(text instanceof JComboBox<?> comboBox){
+                    str = comboBox.getEditor().getItem().toString();
+                }
+                else if(text instanceof JTextField textField){
+                    str = textField.getText();
+                }
+
+
+                boolean isRequired = requiredCols.contains(labelText);
+
+                if(isRequired){
+                    if(str.isBlank()) {
+                        notEmpty = false;
+                        System.out.println("Empty required field: "+labelText);
+                        missingFields += labelText + ", ";
+                    }
+                    else {
+                        qb.setColNames(labelText);
+                        qb.setValues(str);
+                    }
+                }
+                else if(!str.isBlank()){
+                    qb.setColNames(labelText);
+                    qb.setValues(str);
                 }
             }
-            JTextField jwoField = (JTextField) fields.get(0).getComponent(1);
-            qb.where("jwo = "+selectedJwo);
             try {
-                database.sendUpdate(qb.build());
-                dispose();
-            } catch (SQLException ex) {
+                if(notEmpty) {
+                    System.out.println("all required fields filled");
+                    qb.where("jwo=" + selectedJwo);
+                    database.sendUpdate(qb.build());
+                    dispose();
+                }
+                else
+                    JOptionPane.showMessageDialog(null, "You have empty required values: "+missingFields, null, JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(this, ex.getMessage(), null, JOptionPane.ERROR_MESSAGE);
+                String userMessage = ex.getMessage();
+                System.out.println(userMessage);
+                if(userMessage.toLowerCase().contains("duplicate") && userMessage.toLowerCase().contains("key")){
+                    userMessage = "A job with this JWO already exists.";
+                }
+                System.out.println(userMessage);
+                JOptionPane.showMessageDialog(this, userMessage, null, JOptionPane.ERROR_MESSAGE);
+            }finally {
+                database.closeResources();
             }
-
         }
-        if(e.getSource() == resetButton){
-            for(JPanel p : fields){
-                JTextField textField = (JTextField) p.getComponent(1);
-                textField.setText(null);
-            }
+        if(e.getSource() == cancelButton){
+            dispose();
         }
     }
 }

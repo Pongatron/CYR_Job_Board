@@ -18,6 +18,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.EventObject;
 import java.util.Properties;
 
 import static DatabaseInteraction.Filter.FilterStatus.*;
@@ -59,6 +60,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JToolBar mainBar;
     public static int totalWidth;
     private int todayCol = -1;
+
+    ArrayList<Integer> visibleIndexes = new ArrayList<>();
 
     DefaultTableModel dataTableModel;
     DefaultTableModel datesTableModel;
@@ -276,7 +279,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         ResultSetMetaData rsMeta = jobBoardResultSet.getMetaData();
         int colCount = rsMeta.getColumnCount();
 
-        ArrayList<Integer> visibleIndexes = new ArrayList<>();
+        visibleIndexes = new ArrayList<>();
 
         for (int i = 1; i <= colCount; i++) {
             String columnName = rsMeta.getColumnLabel(i);
@@ -327,8 +330,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             String isEditable = props.getProperty(columnLabel);
 
             if("t".equals(isEditable)){
-                System.out.println("column editable: "+i);
                 JTextField editorField = new JTextField();
+                editorField.setBackground(new Color(24, 24, 24));
+                editorField.setForeground(new Color(255,255,255));
+                editorField.setFont(PLAIN_FONT);
+                editorField.setBorder(new LineBorder(Color.GREEN, 2));
+                editorField.setCaretPosition(editorField.getText().length());
+                editorField.setCaretColor(new Color(255,255,255));
 
                 final boolean[] enterPressed = {false};
                 final int[] currentRow = {0};
@@ -336,10 +344,19 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 final String[] currentValue = {""};
                 DefaultCellEditor editor = new DefaultCellEditor(editorField){
                     @Override
+                    public boolean isCellEditable(EventObject anEvent) {
+                        return super.isCellEditable(anEvent);
+                    }
+
+                    @Override
                     public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
                         currentRow[0] = row;
                         currentCol[0] = column;
                         currentValue[0] = value != null ? value.toString() : "";
+
+                        SwingUtilities.invokeLater(()->{
+                            editorField.setCaretPosition(editorField.getText().length());
+                        });
 
                         return super.getTableCellEditorComponent(table, value, isSelected, row, column);
                     }
@@ -382,12 +399,11 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                         super.cancelCellEditing();
                     }
                 };
-
+                editor.setClickCountToStart(1);
                 editorField.addActionListener(e -> {
                     enterPressed[0] = true;
                     editor.stopCellEditing();
                 });
-
                 // Assign the editor to the column
                 dataTable.getColumnModel().getColumn(i).setCellEditor(editor);
             }
@@ -459,9 +475,9 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
             int minWidth = 0;
 
-            for(int i = 0; i < dataTable.getRowCount(); i++){
-                TableCellRenderer cellRenderer = dataTable.getCellRenderer(i, col);
-                Component comp = dataTable.prepareRenderer(cellRenderer, i, col);
+            for(int row = 0; row < dataTable.getRowCount(); row++){
+                TableCellRenderer cellRenderer = dataTable.getCellRenderer(row, col);
+                Component comp = dataTable.prepareRenderer(cellRenderer, row, col);
                 int cellWidth = comp.getPreferredSize().width;
                 if(cellWidth < MAX_CELL_WIDTH)
                     minWidth = Math.max(minWidth, cellWidth + (int)(8 * ZoomManager.getZoom()));
@@ -743,48 +759,52 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         }
         if(e.getSource() == resetViewButton) {
             setDividerLocation();
-            dataTable.setSelectionModel(new DefaultListSelectionModel());
+            //dataTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
             refreshResultSets();
+
             try {
+                setEditableAndDropdownColumns(visibleIndexes);
                 loadTable();
             } catch (SQLException ex) {
+                throw new RuntimeException(ex);
+            } catch (IOException ex) {
                 throw new RuntimeException(ex);
             }
         }
         if(e.getSource() == archiveButton) {
-            setDividerLocation();
-            SelectQueryBuilder qb = new SelectQueryBuilder();
-            qb.select("*");
-            qb.from("job_board");
-            qb.where("is_active = false");
-            SelectQueryBuilder qbCL = new SelectQueryBuilder();
-            qbCL.select("*");
-            qbCL.from("customer_list");
-
-            try {
-                jobBoardResultSet = database.sendSelect(qb.build());
-                customerListResultSet = database.sendSelect(qbCL.build());
-                loadTable();
-            } catch (SQLException ex) {
-                ex.printStackTrace();
-            }
-
-            dataTable.setSelectionModel(new DefaultListSelectionModel() {
-                @Override
-                public void setSelectionInterval(int index0, int index1) {
-                    // Do nothing, effectively preventing selection
-                }
-
-                @Override
-                public void addSelectionInterval(int index0, int index1) {
-                    // Do nothing
-                }
-
-                @Override
-                public void removeSelectionInterval(int index0, int index1) {
-                    // Do nothing
-                }
-            });
+//            setDividerLocation();
+//            SelectQueryBuilder qb = new SelectQueryBuilder();
+//            qb.select("*");
+//            qb.from("job_board");
+//            qb.where("is_active = false");
+//            SelectQueryBuilder qbCL = new SelectQueryBuilder();
+//            qbCL.select("*");
+//            qbCL.from("customer_list");
+//
+//            try {
+//                jobBoardResultSet = database.sendSelect(qb.build());
+//                customerListResultSet = database.sendSelect(qbCL.build());
+//                loadTable();
+//            } catch (SQLException ex) {
+//                ex.printStackTrace();
+//            }
+//
+//            dataTable.setSelectionModel(new DefaultListSelectionModel() {
+//                @Override
+//                public void setSelectionInterval(int index0, int index1) {
+//                    // Do nothing, effectively preventing selection
+//                }
+//
+//                @Override
+//                public void addSelectionInterval(int index0, int index1) {
+//                    // Do nothing
+//                }
+//
+//                @Override
+//                public void removeSelectionInterval(int index0, int index1) {
+//                    // Do nothing
+//                }
+//            });
         }
         if(e.getSource() == plusZoomButton) {
             ZoomManager.increaseZoom();
@@ -792,6 +812,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             //refreshTable();
             setTableFontsAndSizes();
             setDividerLocation();
+            try {
+                setEditableAndDropdownColumns(visibleIndexes);
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            } catch (SQLException ex) {
+                throw new RuntimeException(ex);
+            }
 
             SwingUtilities.invokeLater(()->{
                 setTableFontsAndSizes();
@@ -804,6 +831,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             //refreshTable();
             setTableFontsAndSizes();
             setDividerLocation();
+            try {
+                setEditableAndDropdownColumns(visibleIndexes);
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            } catch (SQLException ex) {
+                throw new RuntimeException(ex);
+            }
 
             SwingUtilities.invokeLater(()->{
                 setTableFontsAndSizes();

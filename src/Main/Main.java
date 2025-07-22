@@ -12,6 +12,7 @@ public class Main {
         PropertiesManager.queryPermissions();
         PropertiesManager.loadColumnPermissions();
         PropertiesManager.loadUserPreferences();
+        PropertiesManager.loadColumnDropdowns();
 
         SwingUtilities.invokeLater(()->{
             try {
