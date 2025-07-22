@@ -17,7 +17,7 @@ public class Main {
             try {
                 new MainWindow();
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                e.printStackTrace();
             }
         });
 

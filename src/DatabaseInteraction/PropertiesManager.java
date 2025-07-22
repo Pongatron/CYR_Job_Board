@@ -18,6 +18,7 @@ public class PropertiesManager {
     public static final String MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH = "resources/menu-column-dropdown.properties";
     public static final String MENU_COLUMN_EDITABLE_PROPERTIES_FILE_PATH = "resources/menu-column-editable.properties";
     public static final String MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH = "resources/menu-column-visible.properties";
+    public static final String COLUMN_REQUIRED_PROPERTIES_FILE_PATH = "resources/column-required.properties";
     public static final String USER_PREF_PROPERTIES_FILE_PATH = "resources/user-preferences.properties";
     private static ResultSet resultSet;
 
@@ -82,6 +83,7 @@ public class PropertiesManager {
         int menuHasDropdownCol = resultSet.findColumn("menu_column_has_dropdown");
         int menuEditableCol = resultSet.findColumn("menu_column_editable");
         int menuVisibleCol = resultSet.findColumn("menu_column_visible");
+        int isRequiredCol = resultSet.findColumn("is_required");
 
         List<PropertyConfig> configs = Arrays.asList(
                 new PropertyConfig(VISIBILITY_PROPERTIES_FILE_PATH, columnNameCol, isVisibleCol, "Cell Column Visibility Properties"),
@@ -89,7 +91,8 @@ public class PropertiesManager {
                 new PropertyConfig(CELL_EDITABLE_PROPERTIES_FILE_PATH, columnNameCol, cellsEditableCol, "Cell Editable Properties"),
                 new PropertyConfig(MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH, columnNameCol, menuHasDropdownCol, "Menu Column Dropdown Properties"),
                 new PropertyConfig(MENU_COLUMN_EDITABLE_PROPERTIES_FILE_PATH, columnNameCol, menuEditableCol, "Menu Column Editable Properties"),
-                new PropertyConfig(MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH, columnNameCol, menuVisibleCol, "Menu Column Visibility Properties")
+                new PropertyConfig(MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH, columnNameCol, menuVisibleCol, "Menu Column Visibility Properties"),
+                new PropertyConfig(COLUMN_REQUIRED_PROPERTIES_FILE_PATH, columnNameCol, isRequiredCol, "Required Column Properties")
         );
         for(PropertyConfig config : configs){
             Properties props = new Properties();
@@ -131,11 +134,15 @@ public class PropertiesManager {
     }
     public static void saveUserPreferences(){
         Properties props = new Properties();
+        try(FileInputStream input = new FileInputStream(USER_PREF_PROPERTIES_FILE_PATH)){
+            props.load(input);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         try(FileOutputStream output = new FileOutputStream(USER_PREF_PROPERTIES_FILE_PATH)){
-
             props.setProperty("zoom", String.valueOf(ZoomManager.getZoom()));
             props.store(output, "User Preferences");
-            output.close();
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -144,7 +151,7 @@ public class PropertiesManager {
 
     public static String[] getColumnOrder() {
         Properties prop = new Properties();
-        try(FileInputStream input = new FileInputStream(PropertiesManager.VISIBILITY_PROPERTIES_FILE_PATH)){
+        try(FileInputStream input = new FileInputStream(PropertiesManager.USER_PREF_PROPERTIES_FILE_PATH)){
             prop.load(input);
 
             String columnOrderString = prop.getProperty("column.order");
@@ -156,10 +163,10 @@ public class PropertiesManager {
         }
         return null;
     }
-    public static String getKeyValue(String key){
+    public static String getKeyValue(String key, String filename){
         Properties prop = new Properties();
-        String value = "true";
-        try(FileInputStream input = new FileInputStream(PropertiesManager.VISIBILITY_PROPERTIES_FILE_PATH)){
+        String value = "t";
+        try(FileInputStream input = new FileInputStream(filename)){
             prop.load(input);
             value = prop.getProperty(key);
             //System.out.println(key+": "+value);

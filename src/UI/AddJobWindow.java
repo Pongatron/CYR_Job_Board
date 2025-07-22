@@ -7,15 +7,20 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.util.Properties;
+import java.util.Set;
 
 public class AddJobWindow extends JFrame implements ActionListener {
 
     private DatabaseInteraction database;
-    private String[] requiredValues;
+    private ResultSet jobBoardResultSet;
     private ArrayList<JPanel> fields;
     private JPanel topPanel;
     private JPanel centerPanel;
@@ -25,10 +30,17 @@ public class AddJobWindow extends JFrame implements ActionListener {
     private JButton resetButton;
     private ArrayList<String> requiredCols;
 
-    public AddJobWindow(){
-        database = new DatabaseInteraction();
+    public AddJobWindow(DatabaseInteraction db, ResultSet rs){
+        database = db;
+        jobBoardResultSet = rs;
         initializeComponents();
-        addFields();
+        try {
+            addFields();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
 
         JLabel headingText = new JLabel("Add Job", SwingConstants.CENTER);
         headingText.setForeground(new Color(200,40,40));
@@ -86,36 +98,27 @@ public class AddJobWindow extends JFrame implements ActionListener {
         fields = new ArrayList<>();
     }
 
-    private void addFields()  {
-        ResultSet rsRequired = database.sendSelect("SELECT * FROM required_columns");
+    private void addFields() throws IOException, SQLException {
         requiredCols = new ArrayList<>();
+        String[] colOrder = PropertiesManager.getColumnOrder();
 
-        SelectQueryBuilder qb = new SelectQueryBuilder();
-        try {
+        Properties requiredProps = new Properties();
+        FileInputStream reqInput = new FileInputStream(PropertiesManager.COLUMN_REQUIRED_PROPERTIES_FILE_PATH);
+        requiredProps.load(reqInput);
 
-            while (rsRequired.next()) {
-                requiredCols.add(rsRequired.getObject(1).toString());
-            }
-        }catch (SQLException ex){
-            ex.printStackTrace();
-        }
+        Properties visibleProps = new Properties();
+        FileInputStream visibleInput = new FileInputStream(PropertiesManager.MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH);
+        visibleProps.load(visibleInput);
 
-        ResultSet rs = null;
-        try {
-            rs = database.sendSelect("SELECT * FROM job_board");
-            ResultSetMetaData rsMeta = null;
-
-            rsMeta = rs.getMetaData();
-            int colCount = rsMeta.getColumnCount();
-            for (int i = 1; i <= colCount; i++) {
-                String labelName = rsMeta.getColumnName(i);
-
-                for(String s : requiredCols){
-                    if(s.equals(labelName))
-                        labelName += "*";
+        for(String columnName : colOrder){
+            String requiredValue = requiredProps.getProperty(columnName);
+            String visibleValue = visibleProps.getProperty(columnName);
+            if("t".equals(visibleValue)){
+                if("t".equals(requiredValue)){
+                    requiredCols.add(columnName);
+                    columnName += "*";
                 }
-
-                JLabel label = new JLabel(labelName);
+                JLabel label = new JLabel(columnName);
                 label.setForeground(Color.white);
                 label.setFont(new Font("SansSerif", Font.BOLD, 20));
 
@@ -134,11 +137,8 @@ public class AddJobWindow extends JFrame implements ActionListener {
                 fields.add(panel);
                 fieldsPanel.add(panel);
             }
-        }catch (SQLException e){
-            e.printStackTrace();
-        }finally {
-            database.closeResources();
         }
+        database.closeResources();
     }
 
 
@@ -148,9 +148,6 @@ public class AddJobWindow extends JFrame implements ActionListener {
         if(e.getSource() == createButton){
             InsertQueryBuilder qb = new InsertQueryBuilder();
             qb.insertInto("job_board");
-//            for(String s : requiredCols) {
-//                qb.setColumns(s);
-//            }
             boolean notEmpty = true;
             String missingFields = "";
             for(JPanel p : fields){
@@ -181,6 +178,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
                 if(notEmpty) {
                     System.out.println("all required fields filled");
                     database.sendUpdate(qb.build());
+                    dispose();
                 }
                 else
                     JOptionPane.showMessageDialog(null, "You have empty required values: "+missingFields, null, JOptionPane.INFORMATION_MESSAGE);

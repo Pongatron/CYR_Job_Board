@@ -18,16 +18,14 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.Properties;
-import java.util.TreeMap;
 
 import static DatabaseInteraction.Filter.FilterStatus.*;
 
 public class MainWindow extends JFrame implements ActionListener, MouseListener {
 
     private static  int ABSOLUTE_MIN_CELL_WIDTH = 50;
-    private static  int MAX_CELL_WIDTH = 200;
+    private static  int MAX_CELL_WIDTH = 400;
     private static  int BASE_FONT_SIZE = 15;
     private static  Dimension TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
     private static  Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(400, 100);
@@ -37,7 +35,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private static  Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 15);
 
     private final DatabaseInteraction database;
-    private ResultSet resultSet;
+    private ResultSet jobBoardResultSet;
+    private ResultSet customerListResultSet;
     private JPanel centerPanel;
     private JPanel topPanel;
     private JPanel buttonPanel;
@@ -70,7 +69,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         updateDimensions();
         initializeComponents();
         syncScrollPanes();
-        refreshTable();
+        refreshResultSets();
+        loadTable();
 
         buttonPanel.add(addJobButton);
         buttonPanel.add(updateJobButton);
@@ -259,6 +259,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     }
 
     public void loadTable()  throws SQLException{
+
         dataTableModel = new DefaultTableModel();
         datesTableModel = new DefaultTableModel();
         createDataTable();
@@ -272,28 +273,27 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
     public void createDataTable() throws SQLException{
         //---------- create datatable
-        ResultSetMetaData rsMeta = resultSet.getMetaData();
+        ResultSetMetaData rsMeta = jobBoardResultSet.getMetaData();
         int colCount = rsMeta.getColumnCount();
 
         ArrayList<Integer> visibleIndexes = new ArrayList<>();
 
         for (int i = 1; i <= colCount; i++) {
             String columnName = rsMeta.getColumnLabel(i);
-            if(PropertiesManager.getKeyValue(columnName).equals("t")) {
-                System.out.println(columnName+": "+i);
+            if("t".equals(PropertiesManager.getKeyValue(columnName, PropertiesManager.VISIBILITY_PROPERTIES_FILE_PATH))) {
                 visibleIndexes.add(i);
                 dataTableModel.addColumn(columnName.replace("_", " "));
             }
         }
 
-
-        while (resultSet.next()) {
+        while (jobBoardResultSet.next()) {
             Object[] row = new Object[visibleIndexes.size()];
             Object[] emptyRow = new Object[visibleIndexes.size()];
 
             for (int i = 0; i < visibleIndexes.size(); i++) {
                 int databaseIndex = visibleIndexes.get(i);
-                Object item = resultSet.getObject(databaseIndex);
+                //System.out.println("database: "+databaseIndex+" table: "+i);
+                Object item = jobBoardResultSet.getObject(databaseIndex);
                 if (item instanceof java.sql.Date) {
                     LocalDate cellDate = ((Date) item).toLocalDate();
                     row[i] = cellDate;
@@ -305,11 +305,96 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             dataTableModel.addRow(row);
             datesTableModel.addRow(emptyRow);
         }
-        resultSet.beforeFirst();
+        jobBoardResultSet.beforeFirst();
+
 
         dataTable.setModel(dataTableModel);
+        try {
+            setEditableAndDropdownColumns(visibleIndexes);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         //-------------------
     }
+
+    public void setEditableAndDropdownColumns(ArrayList<Integer> visibleIndexes) throws IOException, SQLException {
+        Properties props = new Properties();
+        FileInputStream input = new FileInputStream(PropertiesManager.CELL_EDITABLE_PROPERTIES_FILE_PATH);
+        props.load(input);
+
+        for(int i = 0; i < dataTableModel.getColumnCount(); i++){
+            String columnLabel = jobBoardResultSet.getMetaData().getColumnLabel(visibleIndexes.get(i));
+            String isEditable = props.getProperty(columnLabel);
+
+            if("t".equals(isEditable)){
+                System.out.println("column editable: "+i);
+                JTextField editorField = new JTextField();
+
+                final boolean[] enterPressed = {false};
+                final int[] currentRow = {0};
+                final int[] currentCol = {0};
+                final String[] currentValue = {""};
+                DefaultCellEditor editor = new DefaultCellEditor(editorField){
+                    @Override
+                    public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+                        currentRow[0] = row;
+                        currentCol[0] = column;
+                        currentValue[0] = value != null ? value.toString() : "";
+
+                        return super.getTableCellEditorComponent(table, value, isSelected, row, column);
+                    }
+                    @Override
+                    public boolean stopCellEditing() {
+                        if (enterPressed[0]) {
+                            UpdateQueryBuilder qb = new UpdateQueryBuilder();
+                            qb.updateTable("job_board");
+                            try {
+                                qb.setColNames(jobBoardResultSet.getMetaData().getColumnLabel(currentCol[0]+1));
+                                qb.setValues(editorField.getText());
+                                TableColumn targetColumn = dataTable.getColumn("jwo");
+                                TableColumnModel columnModel = dataTable.getColumnModel();
+                                int columnIndex = columnModel.getColumnIndex(targetColumn.getIdentifier());
+                                qb.where("jwo = "+ dataTable.getValueAt(currentRow[0], columnIndex));
+                                database.sendUpdate(qb.build());
+                            } catch (SQLException e) {
+                                enterPressed[0] = false;
+                                throw new RuntimeException(e);
+                            }
+                            enterPressed[0] = false;
+                            refreshResultSets();
+                            try {
+                                loadTable();
+                            } catch (SQLException e) {
+                                enterPressed[0] = false;
+                                throw new RuntimeException(e);
+                            }
+                            setDividerLocation();
+                            return super.stopCellEditing();
+                        } else {
+                            cancelCellEditing(); // Explicitly cancel if Enter wasn't pressed
+                            return false; // Indicate that editing was not successfully stopped (committed)
+                        }
+                    }
+
+                    @Override
+                    public void cancelCellEditing() {
+                        System.out.println("Canceling cell editing.");
+                        super.cancelCellEditing();
+                    }
+                };
+
+                editorField.addActionListener(e -> {
+                    enterPressed[0] = true;
+                    editor.stopCellEditing();
+                });
+
+                // Assign the editor to the column
+                dataTable.getColumnModel().getColumn(i).setCellEditor(editor);
+            }
+        }
+
+    }
+
 
     public void createDatesTable() throws SQLException {
         //--------------------------- create dates table
@@ -320,8 +405,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         LocalDate currentDate = ninetyDaysAgo;
         ArrayList<LocalDate> saturdayList = new ArrayList<>();
 
-        while(resultSet.next()){
-            Date sqlDate = resultSet.getDate("due_date");
+        while(jobBoardResultSet.next()){
+            Date sqlDate = jobBoardResultSet.getDate("due_date");
             LocalDate date = sqlDate.toLocalDate();
             if(date.getDayOfWeek() == DayOfWeek.SATURDAY) {
                 if(!saturdayList.contains(date)) {
@@ -329,7 +414,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 }
             }
         }
-        resultSet.beforeFirst();
+        jobBoardResultSet.beforeFirst();
 
         while(!currentDate.isAfter(oneYearFromNow)){
             if(currentDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
@@ -342,13 +427,14 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 }
                 else
                     datesTableModel.addColumn(currentDate.format(dateFormat));
+                if(currentDate.isEqual(today)){
+                    todayCol = datesTableModel.getColumnCount() - 1;
+                }
             }
-            if(currentDate.isEqual(today)){
+            else if(currentDate.isEqual(today)){
                 datesTableModel.addColumn(currentDate.format(dateFormat));
                 todayCol = datesTableModel.getColumnCount() - 1;
             }
-            System.out.println(currentDate);
-            System.out.println(today);
 
             currentDate = currentDate.plusDays(1);
         }
@@ -379,6 +465,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 int cellWidth = comp.getPreferredSize().width;
                 if(cellWidth < MAX_CELL_WIDTH)
                     minWidth = Math.max(minWidth, cellWidth + (int)(8 * ZoomManager.getZoom()));
+                else
+                    minWidth = MAX_CELL_WIDTH;
             }
             if(headerComp.getPreferredSize().width > minWidth && !headerComp.getText().contains("html")){
                 column.setHeaderRenderer(new RotatedHeaderRenderer(dataTable));
@@ -433,19 +521,19 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         int finishIndex = 1;
         int installIndex = 1;
         int dueDateColumn = 1;
-        while(resultSet.next()){
-            buildIndex = resultSet.findColumn("build");
-            finishIndex = resultSet.findColumn("finish");
-            installIndex = resultSet.findColumn("install");
-            dueDateColumn = resultSet.findColumn("due_date");
+        while(jobBoardResultSet.next()){
+            buildIndex = jobBoardResultSet.findColumn("build");
+            finishIndex = jobBoardResultSet.findColumn("finish");
+            installIndex = jobBoardResultSet.findColumn("install");
+            dueDateColumn = jobBoardResultSet.findColumn("due_date");
 
-            Date sqlDate = resultSet.getDate("due_date");
+            Date sqlDate = jobBoardResultSet.getDate("due_date");
             LocalDate dueDate = sqlDate.toLocalDate();
 
             // get amount of days for each section of time from data table
-            int buildDays = (int) resultSet.getInt(buildIndex);
-            int finishDays = (int) resultSet.getInt(finishIndex);
-            int installDays = (int) resultSet.getInt(installIndex);
+            int buildDays = (int) jobBoardResultSet.getInt(buildIndex);
+            int finishDays = (int) jobBoardResultSet.getInt(finishIndex);
+            int installDays = (int) jobBoardResultSet.getInt(installIndex);
             int daysBack = buildDays + finishDays;
             int daysForward = installDays - 1;
 
@@ -524,7 +612,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             }
             dates.add(new DateRange(dueDate, buildDates, finishDates, installDates, isDueDateSaturday));
         }
-        resultSet.beforeFirst();
+        jobBoardResultSet.beforeFirst();
 
         // Apply the dates for each time period to the custom renderer so it can draw the colored squares
         TableCustom.applyDates(datesTable, dates);
@@ -561,7 +649,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
     public void updateDimensions(){
         ABSOLUTE_MIN_CELL_WIDTH = (int)(50 * ZoomManager.getZoom());
-        MAX_CELL_WIDTH = (int)(125 * ZoomManager.getZoom());
+        MAX_CELL_WIDTH = (int)(300 * ZoomManager.getZoom());
         BASE_FONT_SIZE = (int)(15 * ZoomManager.getZoom());
         TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
         BUTTON_PANEL_PREF_SIZE = new Dimension(400, 100);
@@ -571,16 +659,20 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     }
 
     public void refreshTable() {
-        SelectQueryBuilder qb = new SelectQueryBuilder();
-        qb.select("*");
-        qb.from("job_board");
-        qb.where("is_active = true");
-        try {
-            resultSet = database.sendSelect(qb.build());
-            loadTable();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+
+    }
+
+    public void refreshResultSets(){
+        SelectQueryBuilder qbJB = new SelectQueryBuilder();
+        qbJB.select("*");
+        qbJB.from("job_board");
+        qbJB.where("is_active = true");
+        qbJB.orderBy(new Filter("due_date", ASC));
+        SelectQueryBuilder qbCL = new SelectQueryBuilder();
+        qbCL.select("*");
+        qbCL.from("customer_list");
+        jobBoardResultSet = database.sendSelect(qbJB.build());
+        customerListResultSet = database.sendSelect(qbCL.build());
     }
 
     public void createDropdown(String columnName){
@@ -594,13 +686,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == addJobButton){
-            new AddJobWindow();
+            new AddJobWindow(database, jobBoardResultSet);
         }
         if(e.getSource() == updateJobButton){
             int selectedRow = dataTable.getSelectedRow();
             if(selectedRow != -1) {
                 String selectedJwo = dataTable.getValueAt(selectedRow, 0).toString();
-                new UpdateJobWindow(selectedJwo);
+                new UpdateJobWindow(database, jobBoardResultSet, selectedJwo);
             }
         }
         if(e.getSource() == deleteButton){
@@ -617,8 +709,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             Filter f = new Filter("jwo", DESC);
             qb.orderBy(f);
             try {
-                resultSet = database.sendSelect(qb.build());
-                loadTable();
+                refreshResultSets();
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -630,8 +721,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             Filter f = new Filter("customer", ASC);
             qb.orderBy(f);
             try {
-                resultSet = database.sendSelect(qb.build());
-                loadTable();
+                refreshResultSets();
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -643,8 +733,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             Filter f = new Filter("due_date", DESC);
             qb.orderBy(f);
             try {
-                resultSet = database.sendSelect(qb.build());
-                loadTable();
+                refreshResultSets();
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -655,7 +744,12 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         if(e.getSource() == resetViewButton) {
             setDividerLocation();
             dataTable.setSelectionModel(new DefaultListSelectionModel());
-            refreshTable();
+            refreshResultSets();
+            try {
+                loadTable();
+            } catch (SQLException ex) {
+                throw new RuntimeException(ex);
+            }
         }
         if(e.getSource() == archiveButton) {
             setDividerLocation();
@@ -663,8 +757,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             qb.select("*");
             qb.from("job_board");
             qb.where("is_active = false");
+            SelectQueryBuilder qbCL = new SelectQueryBuilder();
+            qbCL.select("*");
+            qbCL.from("customer_list");
+
             try {
-                resultSet = database.sendSelect(qb.build());
+                jobBoardResultSet = database.sendSelect(qb.build());
+                customerListResultSet = database.sendSelect(qbCL.build());
                 loadTable();
             } catch (SQLException ex) {
                 ex.printStackTrace();
@@ -698,9 +797,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 setTableFontsAndSizes();
                 resetDatesScrollBar();
             });
-
-
-            //JOptionPane.showMessageDialog(this, "current zoom: "+ZoomManager.getZoom(), "", JOptionPane.INFORMATION_MESSAGE);
         }
         if(e.getSource() == minusZoomButton) {
             ZoomManager.decreaseZoom();
@@ -713,7 +809,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 setTableFontsAndSizes();
                 resetDatesScrollBar();
             });
-            //JOptionPane.showMessageDialog(this, "current zoom: "+ZoomManager.getZoom(), "", JOptionPane.INFORMATION_MESSAGE);
         }
     }
 

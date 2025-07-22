@@ -8,15 +8,19 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.util.Properties;
 
 public class UpdateJobWindow extends JFrame implements ActionListener {
 
     private DatabaseInteraction database;
-    private String[] requiredValues;
+    private ResultSet jobBoardResultSet;
     private ArrayList<JPanel> fields;
     private JPanel topPanel;
     private JPanel centerPanel;
@@ -27,11 +31,16 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
     private String selectedJwo;
     private static final Color UPDATE_PANEL_COLOR = new Color(40, 40, 40);
 
-    public UpdateJobWindow(String jwo){
-        database = new DatabaseInteraction();
+    public UpdateJobWindow(DatabaseInteraction db, ResultSet rs,String jwo){
+        database = db;
+        jobBoardResultSet = rs;
         selectedJwo = jwo;
         initializeComponents();
-        addFields();
+        try {
+            addFields();
+        } catch (IOException | SQLException e) {
+            throw new RuntimeException(e);
+        }
 
         JLabel headingText = new JLabel("Update Job", SwingConstants.CENTER);
         headingText.setForeground(new Color(0,100,180));
@@ -89,20 +98,44 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
         fields = new ArrayList<>();
     }
 
-    private void addFields() {
-        ResultSet rs = null;
+    private void addFields() throws IOException, SQLException {
 
-        try {
-            rs = database.sendSelect("SELECT * FROM job_board where jwo = " + selectedJwo);
-            ResultSetMetaData rsMeta = null;
+        jobBoardResultSet.beforeFirst();
+        ArrayList<String> requiredCols = new ArrayList<>();
+        String[] colOrder = PropertiesManager.getColumnOrder();
 
-            if(rs.next()) {
-                rsMeta = rs.getMetaData();
-                int colCount = rsMeta.getColumnCount();
-                for (int i = 1; i <= colCount; i++) {
-                    String labelName = rsMeta.getColumnName(i);
+        Properties requiredProps = new Properties();
+        FileInputStream reqInput = new FileInputStream(PropertiesManager.COLUMN_REQUIRED_PROPERTIES_FILE_PATH);
+        requiredProps.load(reqInput);
 
-                    JLabel label = new JLabel(labelName);
+        Properties visibleProps = new Properties();
+        FileInputStream visibleInput = new FileInputStream(PropertiesManager.MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH);
+        visibleProps.load(visibleInput);
+        ResultSetMetaData rsMeta = null;
+
+        while(jobBoardResultSet.next()) {
+            if(!jobBoardResultSet.getObject("jwo").toString().equals(selectedJwo)){
+                System.out.println("matching jwo");
+                continue;
+            }
+
+            try {
+                rsMeta = jobBoardResultSet.getMetaData();
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+
+
+            for (String columnName : colOrder) {
+                String requiredValue = requiredProps.getProperty(columnName);
+                String visibleValue = visibleProps.getProperty(columnName);
+                String requiredColName = columnName;
+                if ("t".equals(visibleValue)) {
+                    if ("t".equals(requiredValue)) {
+                        requiredColName += "*";
+                        requiredCols.add(columnName);
+                    }
+                    JLabel label = new JLabel(requiredColName);
                     label.setForeground(Color.white);
                     label.setFont(new Font("SansSerif", Font.BOLD, 20));
 
@@ -112,7 +145,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                     text.setBackground(new Color(60, 60, 60));
                     text.setForeground(Color.WHITE);
                     text.setFont(new Font("SansSerif", Font.PLAIN, 20));
-                    text.setBorder(new EmptyBorder(5,5,5,5));
+                    text.setBorder(new EmptyBorder(5, 5, 5, 5));
 
                     JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
                     panel.setBackground(new Color(40, 40, 40));
@@ -120,17 +153,11 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                     panel.add(text);
                     fields.add(panel);
                     fieldsPanel.add(panel);
-                    text.setText(rs.getString(i));
+                    int databaseColIndex = jobBoardResultSet.findColumn(columnName);
+                    Object value = jobBoardResultSet.getObject(databaseColIndex);
+                    text.setText(value != null ? value.toString() : "");
                 }
             }
-            else{
-                JOptionPane.showMessageDialog(this, "Error updating job: can't find jwo", null, JOptionPane.ERROR_MESSAGE);
-            }
-        }catch (SQLException e){
-            database.closeResources();
-            e.printStackTrace();
-        }finally {
-            database.closeResources();
         }
     }
 
@@ -143,7 +170,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                 JLabel label = (JLabel) p.getComponent(0);
                 JTextField textField = (JTextField) p.getComponent(1);
                 if(!textField.getText().isBlank()){
-                    qb.setColNames(label.getText());
+                    qb.setColNames(label.getText().replace("*", ""));
                     qb.setValues(textField.getText());
                 }
             }
@@ -151,10 +178,12 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
             qb.where("jwo = "+selectedJwo);
             try {
                 database.sendUpdate(qb.build());
+                dispose();
             } catch (SQLException ex) {
                 ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, ex.getMessage(), null, JOptionPane.ERROR_MESSAGE);
             }
-            dispose();
+
         }
         if(e.getSource() == resetButton){
             for(JPanel p : fields){
