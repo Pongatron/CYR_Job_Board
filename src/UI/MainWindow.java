@@ -10,8 +10,9 @@ import javax.swing.event.ChangeListener;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.*;
 import java.time.DayOfWeek;
@@ -38,9 +39,11 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private final DatabaseInteraction database;
     private ResultSet jobBoardResultSet;
     private ResultSet customerListResultSet;
-    private JPanel centerPanel;
-    private JPanel topPanel;
+    private JPanel leftPanel;
+    private JPanel topContainerPanel;
     private JPanel buttonPanel;
+    private JPanel topTablePanel;
+    private JPanel centerPanel;
     private JButton addJobButton;
     private JButton updateJobButton;
     private JButton deleteButton;
@@ -54,10 +57,11 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JButton minusZoomButton;
     private JScrollPane tableScroll;
     private JScrollPane datesScroll;
+    private JScrollPane timeOffScroll;
     private JTable dataTable;
     private JTable datesTable;
+    private JTable timeOffTable;
     private JSplitPane splitPane;
-    private JToolBar mainBar;
     public static int totalWidth;
     private int todayCol = -1;
 
@@ -82,8 +86,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         buttonPanel.add(customerFilterButton);
         buttonPanel.add(dateFilterButton);
 
-        JPanel topContainerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        topContainerPanel.setBackground(new Color(24,24,24));
         topContainerPanel.add(buttonPanel);
         topContainerPanel.add(resetViewButton);
         topContainerPanel.add(archiveButton);
@@ -91,15 +93,18 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         topContainerPanel.add(minusZoomButton);
         topContainerPanel.add(plusZoomButton);
 
-
-        mainBar.add(topContainerPanel);
-
-        centerPanel.setPreferredSize(new Dimension(totalWidth, 200));
-        centerPanel.add(tableScroll, BorderLayout.CENTER);
+        leftPanel.setPreferredSize(new Dimension(totalWidth, 100));
+        leftPanel.add(tableScroll, BorderLayout.CENTER);
         setDividerLocation();
 
-        this.add(mainBar, BorderLayout.NORTH);
-        this.add(splitPane, BorderLayout.CENTER);
+        topTablePanel.add(timeOffScroll, BorderLayout.EAST);
+        //topTablePanel.setMinimumSize(new Dimension(100, 10));
+        centerPanel.add(topTablePanel, BorderLayout.NORTH);
+        centerPanel.add(splitPane, BorderLayout.CENTER);
+
+        this.add(centerPanel, BorderLayout.CENTER);
+        this.add(topContainerPanel, BorderLayout.NORTH);
+//        this.add(splitPane, BorderLayout.CENTER);
 
         this.addWindowListener(new WindowAdapter() {
             @Override
@@ -140,15 +145,31 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         datesTable.setCellSelectionEnabled(false);
         datesTable.setBackground(new Color(24,24,24));
 
-        topPanel = new JPanel();
-        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.X_AXIS));
-        topPanel.setBackground(new Color(24,24,24));
-        topPanel.setPreferredSize(TOP_PANEL_PREF_SIZE);
-        topPanel.setBorder(new EmptyBorder(20,20,20,20));
+        timeOffTable = new JTable();
+        timeOffTable.getTableHeader().addMouseListener(this);
+        timeOffTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        timeOffTable.setDefaultEditor(Object.class, null);
+        timeOffTable.getTableHeader().setReorderingAllowed(false);
+        timeOffTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        timeOffTable.setRowSelectionAllowed(false);
+        timeOffTable.setColumnSelectionAllowed(false);
+        timeOffTable.setCellSelectionEnabled(false);
+        timeOffTable.setBackground(new Color(24,24,24));
+
+        topContainerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        topContainerPanel.setBackground(new Color(24,24,24));
+
+        leftPanel = new JPanel();
+        leftPanel.setLayout(new BorderLayout());
+        leftPanel.setBackground(new Color(24,24,24));
 
         centerPanel = new JPanel();
         centerPanel.setLayout(new BorderLayout());
         centerPanel.setBackground(new Color(24,24,24));
+
+        topTablePanel = new JPanel();
+        topTablePanel.setLayout(new BorderLayout());
+        topTablePanel.setBackground(new Color(24,24,24));
 
         buttonPanel = new JPanel();
         buttonPanel.setLayout(new GridLayout(2,3, 10,10));
@@ -233,11 +254,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         minusZoomButton.setFocusable(false);
         minusZoomButton.addActionListener(this);
 
-        mainBar = new JToolBar();
-        mainBar.setFloatable(false);
-        mainBar.setPreferredSize(new Dimension(0, 100));
-        mainBar.setBackground(new Color(24,24,24));
-
         tableScroll = new JScrollPane(dataTable);
         tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
         tableScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
@@ -253,12 +269,40 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         datesScroll.getVerticalScrollBar().setBackground(new Color(24,24,24));
         datesScroll.getHorizontalScrollBar().setBackground(new Color(24,24,24));
 
-        splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, centerPanel,datesScroll);
+        timeOffScroll = new JScrollPane(timeOffTable);
+        timeOffScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        timeOffScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        timeOffScroll.getViewport().setBackground(new Color(24,24,24));
+        timeOffScroll.getVerticalScrollBar().setBackground(new Color(24,24,24));
+        timeOffScroll.getHorizontalScrollBar().setBackground(new Color(24,24,24));
+
+        splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, datesScroll);
         splitPane.setDividerSize(5);
         splitPane.setBorder(null);
 
         TableCustom.apply(tableScroll, TableCustom.TableType.DEFAULT);
         TableCustom.apply(datesScroll, TableCustom.TableType.VERTICAL);
+        TableCustom.apply(timeOffScroll, TableCustom.TableType.TIMEOFF);
+
+        splitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, new PropertyChangeListener() {
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+
+                if(evt.getPropertyName().equals(JSplitPane.DIVIDER_LOCATION_PROPERTY)) {
+
+                    SwingUtilities.invokeLater(()->{
+                        System.out.println("guh");
+                        timeOffScroll.setPreferredSize(new Dimension(datesScroll.getWidth(), timeOffTable.getPreferredSize().height));
+                        System.out.println(splitPane.getRightComponent().getWidth());
+                        timeOffScroll.revalidate();
+                        timeOffScroll.repaint();
+                        topTablePanel.revalidate();
+                        topTablePanel.repaint();
+                    });
+
+                }
+            }
+        });
     }
 
     public void loadTable()  throws SQLException{
@@ -270,6 +314,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         setTableFontsAndSizes();
         populateDatesTable();
         resetDatesScrollBar();
+        populateTimeOffTable();
 
         database.closeResources();
     }
@@ -416,10 +461,12 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         //--------------------------- create dates table
         DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E- dd- MMM");
         LocalDate today = LocalDate.now();
-        LocalDate ninetyDaysAgo = today.minusDays(90);
+        LocalDate oneYearAgo = today.minusDays(365);
         LocalDate oneYearFromNow = today.plusDays(365);
-        LocalDate currentDate = ninetyDaysAgo;
+        LocalDate currentDate = oneYearAgo;
         ArrayList<LocalDate> saturdayList = new ArrayList<>();
+
+        DefaultTableModel tm = new DefaultTableModel();
 
         while(jobBoardResultSet.next()){
             Date sqlDate = jobBoardResultSet.getDate("due_date");
@@ -438,23 +485,31 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                     for(LocalDate d : saturdayList){
                         if(d.equals(currentDate)) {
                             datesTableModel.addColumn(currentDate.format(dateFormat));
+                            tm.addColumn(currentDate.format(dateFormat));
                         }
                     }
                 }
-                else
+                else {
                     datesTableModel.addColumn(currentDate.format(dateFormat));
+                    tm.addColumn(currentDate.format(dateFormat));
+                }
                 if(currentDate.isEqual(today)){
                     todayCol = datesTableModel.getColumnCount() - 1;
                 }
             }
             else if(currentDate.isEqual(today)){
                 datesTableModel.addColumn(currentDate.format(dateFormat));
+                tm.addColumn(currentDate.format(dateFormat));
                 todayCol = datesTableModel.getColumnCount() - 1;
             }
 
             currentDate = currentDate.plusDays(1);
         }
         datesTable.setModel(datesTableModel);
+        tm.addRow(new Object[visibleIndexes.size()]);
+        System.out.println(tm.getRowCount());
+        timeOffTable.setModel(tm);
+        timeOffTable.setTableHeader(null);
         //------------------------------
     }
 
@@ -464,6 +519,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         datesTable.getTableHeader().setFont(BOLD_FONT);
         dataTable.setFont(PLAIN_FONT);
         datesTable.setFont(PLAIN_FONT);
+        timeOffTable.setFont(PLAIN_FONT);
 
         // calculate each column width and set it as the preferred size so nothing looks cut off
         totalWidth = 0;
@@ -509,6 +565,9 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             datesTable.getColumnModel().getColumn(i).setMinWidth((int)(30 * ZoomManager.getZoom()));
             datesTable.getColumnModel().getColumn(i).setMaxWidth((int)(30 * ZoomManager.getZoom()));
             datesTable.getColumnModel().getColumn(i).setPreferredWidth((int)(30 * ZoomManager.getZoom()));
+            timeOffTable.getColumnModel().getColumn(i).setMinWidth((int)(30 * ZoomManager.getZoom()));
+            timeOffTable.getColumnModel().getColumn(i).setMaxWidth((int)(30 * ZoomManager.getZoom()));
+            timeOffTable.getColumnModel().getColumn(i).setPreferredWidth((int)(30 * ZoomManager.getZoom()));
             TableColumn column = datesTable.getColumnModel().getColumn(i);
             TableCellRenderer headerRenderer = datesTable.getTableHeader().getDefaultRenderer();
             Component headerComp = headerRenderer.getTableCellRendererComponent(datesTable, column.getHeaderValue(), false, false, -1, i);
@@ -525,6 +584,15 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         dataTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
         datesTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
+        timeOffTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
+//        centerPanel.setMinimumSize(new Dimension(totalWidth, 0));
+//        datesScroll.setMinimumSize(new Dimension(totalWidth, 0));
+
+//        timeOffScroll.setPreferredSize(new Dimension((int)( 1/ZoomManager.getZoom() * splitPane.getRightComponent().getPreferredSize().width), 50));
+//        timeOffScroll.revalidate();
+//        timeOffScroll.repaint();
+//        topTablePanel.revalidate();
+//        topTablePanel.repaint();
     }
 
     // Populate dates table with colored days
@@ -632,23 +700,75 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         // Apply the dates for each time period to the custom renderer so it can draw the colored squares
         TableCustom.applyDates(datesTable, dates);
+        //populateTimeOffTable();
+    }
+
+    public void populateTimeOffTable() throws SQLException {
+        SelectQueryBuilder qb = new SelectQueryBuilder();
+        qb.select("*");
+        qb.from("time_off");
+        ResultSet rs = database.sendSelect(qb.build());
+
+        ArrayList<TimeOffDates> timeOffDatesList = new ArrayList<>();
+
+        int personIndex = 1;
+        int startDateIndex = 1;
+        int endDateIndex = 1;
+        while(rs.next()){
+            personIndex = rs.findColumn("person");
+            startDateIndex = rs.findColumn("start_date");
+            endDateIndex = rs.findColumn("end_date");
+
+            Date sqlDate = rs.getDate("start_date");
+            LocalDate startDate = sqlDate.toLocalDate();
+            sqlDate = rs.getDate("end_date");
+            LocalDate endDate = sqlDate.toLocalDate();
+
+            ArrayList<LocalDate> timeOffDates = new ArrayList<>();
+            LocalDate currentDate = startDate;
+
+
+            while(currentDate.isBefore(endDate)){
+                if(currentDate.getDayOfWeek() != DayOfWeek.SATURDAY && currentDate.getDayOfWeek() != DayOfWeek.SUNDAY){
+                    timeOffDates.add(currentDate);
+                }
+                currentDate = currentDate.plusDays(1);
+            }
+
+            timeOffDatesList.add(new TimeOffDates(rs.getString(personIndex), timeOffDates));
+        }
+        TableCustom.applyTimeOffDates(timeOffTable, timeOffDatesList);
     }
 
     // syncs both scroll bars in dataTable and datesTable to move together
     public void syncScrollPanes() {
-        JScrollBar vScroll1 = tableScroll.getVerticalScrollBar();
-        JScrollBar vScroll2 = datesScroll.getVerticalScrollBar();
+        JScrollBar vScrollData = tableScroll.getVerticalScrollBar();
+        JScrollBar vScrollDates = datesScroll.getVerticalScrollBar();
+        JScrollBar hScrolldates = datesScroll.getHorizontalScrollBar();
+        JScrollBar hScrollTimeoff = timeOffScroll.getHorizontalScrollBar();
 
-        vScroll1.getModel().addChangeListener(new ChangeListener() {
+        vScrollData.getModel().addChangeListener(new ChangeListener() {
             @Override
             public void stateChanged(ChangeEvent e) {
-                vScroll2.setValue(vScroll1.getValue());
+                vScrollDates.setValue(vScrollData.getValue());
             }
         });
-        vScroll2.getModel().addChangeListener(new ChangeListener() {
+        vScrollDates.getModel().addChangeListener(new ChangeListener() {
             @Override
             public void stateChanged(ChangeEvent e) {
-                vScroll1.setValue(vScroll2.getValue());
+                vScrollData.setValue(vScrollDates.getValue());
+            }
+        });
+        hScrolldates.getModel().addChangeListener(new ChangeListener() {
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                hScrollTimeoff.setValue(hScrolldates.getValue());
+            }
+        });
+        hScrollTimeoff.getModel().addChangeListener(new ChangeListener() {
+            @Override
+            public void stateChanged(ChangeEvent e) {
+                hScrolldates.setValue(hScrollTimeoff.getValue());
             }
         });
     }
@@ -821,7 +941,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             }
 
             SwingUtilities.invokeLater(()->{
-                setTableFontsAndSizes();
+                //setTableFontsAndSizes();
                 resetDatesScrollBar();
             });
         }
@@ -840,7 +960,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             }
 
             SwingUtilities.invokeLater(()->{
-                setTableFontsAndSizes();
+                //setTableFontsAndSizes();
                 resetDatesScrollBar();
             });
         }

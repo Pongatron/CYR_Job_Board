@@ -247,7 +247,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                         qb.setValues(str);
                     }
                 }
-                else if(!str.isBlank()){
+                else{
                     qb.setColNames(labelText);
                     qb.setValues(str);
                 }

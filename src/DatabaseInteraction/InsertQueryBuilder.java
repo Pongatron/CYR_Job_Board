@@ -39,14 +39,23 @@ public class InsertQueryBuilder {
         }
         sb.append(")");
 
-        sb.append(" VALUES ('");
+        sb.append(" VALUES (");
         for(int i = 0; i < values.size(); i++){
-            sb.append(values.get(i));
+
+            if(!values.get(i).isBlank()){
+                sb.append("'");
+                sb.append(values.get(i));
+                sb.append("'");
+            }
+            else{
+                sb.append("null");
+            }
+
             if (i < values.size() - 1) {
-                sb.append("', '");
+                sb.append(", ");
             }
         }
-        sb.append("');");
+        sb.append(");");
 
         System.out.println("InsertQueryBuilder: "+sb.toString());
         return sb.toString();

@@ -47,35 +47,36 @@ public class DateTableCustomCellRenderer extends DefaultTableCellRenderer {
             com.setBackground(ROW2_COLOR);
         }
         com.setForeground(Color.white);
+        if(dates != null) {
 
-        DateRange dateRange = dates.get(row);
-        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E- dd- MMM");
-        if(isSelected){
-            com.setBackground(table.getSelectionBackground());
-        }
-        else{
-            if(row == hoverRow.getIndex()){
-                com.setBackground(HOVER_COLOR);
-            }
-            for(LocalDate date : dateRange.getBuildDays()){
-                String dateString = date.format(dateFormat);
-                if(dateString.equals(table.getColumnName(column))){
-                    com.setBackground(BUILD_COLOR);
-                    break;
+            DateRange dateRange = dates.get(row);
+            DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E- dd- MMM");
+            if (isSelected) {
+                com.setBackground(table.getSelectionBackground());
+            } else {
+                if (row == hoverRow.getIndex()) {
+                    com.setBackground(HOVER_COLOR);
                 }
-            }
-            for(LocalDate date : dateRange.getFinishDays()){
-                String dateString = date.format(dateFormat);
-                if(dateString.equals(table.getColumnName(column))){
-                    com.setBackground(FINISH_COLOR);
-                    break;
+                for (LocalDate date : dateRange.getBuildDays()) {
+                    String dateString = date.format(dateFormat);
+                    if (dateString.equals(table.getColumnName(column))) {
+                        com.setBackground(BUILD_COLOR);
+                        break;
+                    }
                 }
-            }
-            for(LocalDate date : dateRange.getInstallDays()){
-                String dateString = date.format(dateFormat);
-                if(dateString.equals(table.getColumnName(column))){
-                    com.setBackground(INSTALL_COLOR);
-                    break;
+                for (LocalDate date : dateRange.getFinishDays()) {
+                    String dateString = date.format(dateFormat);
+                    if (dateString.equals(table.getColumnName(column))) {
+                        com.setBackground(FINISH_COLOR);
+                        break;
+                    }
+                }
+                for (LocalDate date : dateRange.getInstallDays()) {
+                    String dateString = date.format(dateFormat);
+                    if (dateString.equals(table.getColumnName(column))) {
+                        com.setBackground(INSTALL_COLOR);
+                        break;
+                    }
                 }
             }
         }

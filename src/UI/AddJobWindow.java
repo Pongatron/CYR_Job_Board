@@ -134,9 +134,9 @@ public class AddJobWindow extends JFrame implements ActionListener {
                     columnName += "*";
                 }
                 JLabel label = new JLabel(columnName);
-//                if(columnName.contains("*"))
-//                    label.setForeground(new Color(255, 50,50));
-//                else
+                if(columnName.contains("*"))
+                    label.setForeground(new Color(255, 50,50));
+                else
                     label.setForeground(Color.white);
                 label.setFont(new Font("SansSerif", Font.BOLD, 20));
 
@@ -225,7 +225,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
                         qb.setValues(str);
                     }
                 }
-                else if(!str.isBlank()){
+                else{
                     qb.setColumns(labelText);
                     qb.setValues(str);
                 }

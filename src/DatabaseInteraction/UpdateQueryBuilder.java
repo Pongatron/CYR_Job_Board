@@ -41,8 +41,16 @@ public class UpdateQueryBuilder {
         sb.append(" SET ");
         for(int i = 0; i < colNames.size(); i++){
             sb.append(colNames.get(i));
-            sb.append(" = '");
-            sb.append(colValues.get(i) + "'");
+            sb.append(" = ");
+            if(!colValues.get(i).isBlank()){
+                sb.append("'");
+                sb.append(colValues.get(i));
+                sb.append("'");
+            }
+            else{
+                sb.append("null");
+            }
+
             if (i < colNames.size() - 1) {
                 sb.append(", ");
             }

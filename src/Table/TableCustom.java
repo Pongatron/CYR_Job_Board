@@ -11,7 +11,7 @@ import java.util.ArrayList;
 
 public class TableCustom {
 
-    public enum TableType {MULTI_LINE, DEFAULT, VERTICAL}
+    public enum TableType {MULTI_LINE, DEFAULT, VERTICAL, TIMEOFF}
 
     public static final Color GRIDLINE_COLOR = new Color(70,70,70);
     public static final Color HEADERTEXT_COLOR = new Color(255,255,255);
@@ -32,6 +32,9 @@ public class TableCustom {
         }
         else if(type == TableType.VERTICAL){
             cellRender = new DateTableCustomCellRenderer(hoverRow);
+        }
+        else if(type == TableType.TIMEOFF){
+            cellRender = new TimeOffCustomCellRenderer(hoverRow);
         }
         else{
             cellRender = new TextAreaCellRenderer(hoverRow);
@@ -114,5 +117,9 @@ public class TableCustom {
     public static void applyDates(JTable table, ArrayList<DateRange> dates){
         DateTableCustomCellRenderer renderer = (DateTableCustomCellRenderer) table.getDefaultRenderer(Object.class);
         renderer.setDates(dates);
+    }
+    public static void applyTimeOffDates(JTable table, ArrayList<TimeOffDates> dates){
+        TimeOffCustomCellRenderer renderer = (TimeOffCustomCellRenderer) table.getDefaultRenderer(Object.class);
+        renderer.setTimeOffDates(dates);
     }
 }
