@@ -27,6 +27,7 @@ public class TimeOffCustomCellRenderer extends DefaultTableCellRenderer {
     public TimeOffCustomCellRenderer(HoverIndex hoverRow){
         this.hoverRow = hoverRow;
         setHorizontalAlignment(SwingConstants.CENTER);
+        setVerticalAlignment(SwingConstants.BOTTOM);
     }
 
     @Override
@@ -52,16 +53,23 @@ public class TimeOffCustomCellRenderer extends DefaultTableCellRenderer {
         //System.out.println(dates.get(1));
 
         if(dates != null) {
+            String allPeople = "";
             for(int i = 0; i < dates.size(); i++) {
                 TimeOffDates dateRange = dates.get(i);
                 DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E- dd- MMM");
 
-                for (LocalDate date : dateRange.getOffDays()) {
-                    String dateString = date.format(dateFormat);
-                    if (dateString.equals(table.getColumnName(column))) {
-                        label.setText(dateRange.getPerson());
-                        label.setBackground(new Color(24,80,24));
-                        //System.out.println(dateString + " " + dateRange.getPerson());
+                if(!allPeople.contains(dateRange.getPerson())) {
+                    for (LocalDate date : dateRange.getOffDays()) {
+                        String dateString = date.format(dateFormat);
+                        if (dateString.equals(table.getColumnName(column))) {
+
+                            allPeople += dateRange.getPerson() + " ";
+                            String wrappedText = "<html><center style='text-align: left'>" + allPeople.replace(" ", "<br>") + "</center></html>";
+
+                            label.setText(wrappedText);
+                            label.setBackground(new Color(24, 80, 24));
+                            //System.out.println(dateString + " " + dateRange.getPerson());
+                        }
                     }
                 }
             }

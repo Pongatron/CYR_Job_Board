@@ -30,7 +30,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private static  int MAX_CELL_WIDTH = 400;
     private static  int BASE_FONT_SIZE = 15;
     private static  Dimension TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
-    private static  Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(400, 100);
+    private static  Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(400, 50);
     private static  Dimension TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
     private static  Font PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
     private static  Font BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
@@ -52,6 +52,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JButton dateFilterButton;
     private JButton todayButton;
     private JButton resetViewButton;
+    private JButton timeOffButton;
     private JButton archiveButton;
     private JButton plusZoomButton;
     private JButton minusZoomButton;
@@ -89,6 +90,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         topContainerPanel.add(buttonPanel);
         topContainerPanel.add(resetViewButton);
         topContainerPanel.add(archiveButton);
+        topContainerPanel.add(timeOffButton);
         topContainerPanel.add(todayButton);
         topContainerPanel.add(minusZoomButton);
         topContainerPanel.add(plusZoomButton);
@@ -98,7 +100,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         setDividerLocation();
 
         topTablePanel.add(timeOffScroll, BorderLayout.EAST);
-        //topTablePanel.setMinimumSize(new Dimension(100, 10));
         centerPanel.add(topTablePanel, BorderLayout.NORTH);
         centerPanel.add(splitPane, BorderLayout.CENTER);
 
@@ -174,7 +175,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         buttonPanel = new JPanel();
         buttonPanel.setLayout(new GridLayout(2,3, 10,10));
         buttonPanel.setPreferredSize(BUTTON_PANEL_PREF_SIZE);
-        buttonPanel.setBorder(new EmptyBorder(20,20,20,20));
+        buttonPanel.setBorder(new EmptyBorder(0,20,0,20));
         buttonPanel.setBackground(new Color(24,24,24));
 
         addJobButton = new JButton("Add Job");
@@ -240,6 +241,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         archiveButton.setFocusable(false);
         archiveButton.addActionListener(this);
 
+        timeOffButton = new JButton("Time Off");
+        timeOffButton.setBackground(new Color(0, 0, 0));
+        timeOffButton.setForeground(new Color(255,255,255));
+        timeOffButton.setFont(BUTTON_FONT);
+        timeOffButton.setFocusable(false);
+        timeOffButton.addActionListener(this);
+
         plusZoomButton = new JButton("+");
         plusZoomButton.setBackground(new Color(0, 0, 0));
         plusZoomButton.setForeground(new Color(255,255,255));
@@ -291,9 +299,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 if(evt.getPropertyName().equals(JSplitPane.DIVIDER_LOCATION_PROPERTY)) {
 
                     SwingUtilities.invokeLater(()->{
-                        System.out.println("guh");
                         timeOffScroll.setPreferredSize(new Dimension(datesScroll.getWidth(), timeOffTable.getPreferredSize().height));
-                        System.out.println(splitPane.getRightComponent().getWidth());
                         timeOffScroll.revalidate();
                         timeOffScroll.repaint();
                         topTablePanel.revalidate();
@@ -584,7 +590,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         dataTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
         datesTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
-        timeOffTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
+        timeOffTable.setRowHeight((int)(70 * ZoomManager.getZoom()));
 //        centerPanel.setMinimumSize(new Dimension(totalWidth, 0));
 //        datesScroll.setMinimumSize(new Dimension(totalWidth, 0));
 
@@ -715,7 +721,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         int startDateIndex = 1;
         int endDateIndex = 1;
         while(rs.next()){
-            personIndex = rs.findColumn("person");
+            personIndex = rs.findColumn("worker");
             startDateIndex = rs.findColumn("start_date");
             endDateIndex = rs.findColumn("end_date");
 
@@ -734,6 +740,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 }
                 currentDate = currentDate.plusDays(1);
             }
+            timeOffDates.add(currentDate);
 
             timeOffDatesList.add(new TimeOffDates(rs.getString(personIndex), timeOffDates));
         }
@@ -788,7 +795,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         MAX_CELL_WIDTH = (int)(300 * ZoomManager.getZoom());
         BASE_FONT_SIZE = (int)(15 * ZoomManager.getZoom());
         TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
-        BUTTON_PANEL_PREF_SIZE = new Dimension(400, 100);
+        BUTTON_PANEL_PREF_SIZE = new Dimension(400, 70);
         TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
         PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
         BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
@@ -926,6 +933,11 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 //                }
 //            });
         }
+
+        if(e.getSource() == timeOffButton){
+            new AddTimeOffWindow(database);
+        }
+
         if(e.getSource() == plusZoomButton) {
             ZoomManager.increaseZoom();
             updateDimensions();
