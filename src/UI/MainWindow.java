@@ -172,76 +172,6 @@ public class MainWindow extends JFrame implements ActionListener {
 
     }
 
-    private static String channel = "table_update";
-    private static boolean running = true;
-
-    public static void listenToDatabase(){
-        Thread listenerThread = new Thread(() -> {
-            Connection conn = null; // Declare outside try-with-resources to use in finally
-            try {
-                conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
-                PGConnection pgconn = conn.unwrap(PGConnection.class);
-
-                if (pgconn == null) {
-                    System.err.println("Not a PostgreSQL connection or cannot unwrap to PGConnection.");
-                    return;
-                }
-
-                try (Statement stmt = conn.createStatement()) {
-                    stmt.execute("LISTEN " + channel);
-                    System.out.println("Listening for notifications on channel: " + channel);
-                }
-
-                while (running) {
-                    // Option 1: Using the connection's wait method (more efficient)
-                    // This will block until a notification arrives or the timeout occurs
-                    // You need to synchronize on the connection object itself
-                    synchronized (conn) {
-                        conn.wait(5000); // Wait for up to 5 seconds for a notification
-                        // If 0, it waits indefinitely until notified
-                    }
-
-                    // Option 2: Polling with a sleep (less efficient but often simpler to get working initially)
-                    // You only need this if conn.wait() isn't working or you prefer it.
-                    // If no notifications, you need to sleep to prevent busy-waiting.
-                    // This line would go outside the `if (notifications != null)` block if you use it.
-                    // Thread.sleep(500); // Sleep for 500ms if no notifications received
-
-                    PGNotification[] notifications = pgconn.getNotifications();
-
-                    if (notifications != null && notifications.length > 0) {
-//                        for (PGNotification notification : notifications) {
-//                            System.out.println("NOTIFICATION: Channel=" + notification.getName() +
-//                                    ", Payload=" + notification.getParameter() +
-//                                    ", PID=" + notification.getPID());
-//
-//                            // Execute UI update on the Event Dispatch Thread (EDT)
-//
-//                        }
-                        SwingUtilities.invokeLater(()->{});
-                    }
-                    // If using Thread.sleep(), it would go here for Option 2.
-                }
-            } catch (SQLException e) {
-                System.err.println("Database connection error or LISTEN/NOTIFY issue: " + e.getMessage());
-                e.printStackTrace();
-                // IMPORTANT: Implement reconnect/retry logic here for robustness
-                try { Thread.sleep(5000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                System.out.println("Listener thread interrupted.");
-            } finally {
-                // Ensure the connection is closed even if an exception occurs
-                if (conn != null) {
-                    try { conn.close(); } catch (SQLException e) { e.printStackTrace(); }
-                }
-                System.out.println("PostgreSQL Listener stopped.");
-            }
-        }, "Postgres-Listener-Thread"); // Give your thread a name for easier debugging
-        listenerThread.setDaemon(true); // Make it a daemon thread so it doesn't prevent JVM exit
-        listenerThread.start();
-    }
-
     public void initializeComponents(){
         dataTable = new JTable();
         //dataTable.getTableHeader().addMouseListener(this);
@@ -709,6 +639,13 @@ public class MainWindow extends JFrame implements ActionListener {
         System.out.println("SetTableFonts Execution time: " + Duration.between(start, end).toMillis());
 
         setTableFontsAndSizes();
+        try {
+            setEditableAndDropdownColumns(visibleIndexes);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
         this.revalidate();
         this.repaint();
 
@@ -909,6 +846,7 @@ public class MainWindow extends JFrame implements ActionListener {
         FileInputStream dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
         dropdownListProps.load(dropdownListInput);
 
+        DefaultCellEditor oldEditor = (DefaultCellEditor) dataTable.getColumnModel().getColumn(0).getCellEditor();
         DefaultCellEditor editor = null;
 
         jobBoardResultSet.beforeFirst();
@@ -919,6 +857,7 @@ public class MainWindow extends JFrame implements ActionListener {
             JComponent text = new JComponent(){};
 
             if("t".equals(isEditableValue)){
+                System.out.println("editable");
                 JTextField editorField = new JTextField();
                 editorField.setBackground(new Color(24, 24, 24));
                 editorField.setForeground(new Color(255,255,255));
@@ -996,7 +935,9 @@ public class MainWindow extends JFrame implements ActionListener {
                 text = editorField;
             }
             else if("t".equals(isDropdownValue)){
+                System.out.println("dropdown");
                 String columnName = columnLabel;
+                System.out.println(columnName+": "+isDropdownValue);
                 if(columnLabel.equals("mechanic"))
                     columnName = "worker";
                 String dropdownList = dropdownListProps.getProperty(columnName + "_list.dropdown.options");
@@ -1021,7 +962,7 @@ public class MainWindow extends JFrame implements ActionListener {
                 comboBox.setForeground(Color.WHITE);
                 comboBox.setFont(PLAIN_FONT);
                 comboBox.setBorder(new EmptyBorder(5, 5, 5, 5));
-                comboBox.setMaximumRowCount(5);
+                comboBox.setMaximumRowCount(10);
 
 
                 final boolean[] enterPressed = {false};
@@ -1104,6 +1045,10 @@ public class MainWindow extends JFrame implements ActionListener {
                 });
                 text = comboBox;
             }
+            else{
+                System.out.println("neither");
+                editor = oldEditor;
+            }
 
             dataTable.getColumnModel().getColumn(i).setCellEditor(editor);
         }
@@ -1142,10 +1087,8 @@ public class MainWindow extends JFrame implements ActionListener {
             resetDatesScrollBar();
         }
         if(e.getSource() == resetViewButton) {
-
             currentBoardMode = JobBoardMode.ACTIVE_JOBS;
             refreshData("due_date");
-
         }
         if(e.getSource() == archiveButton) {
             currentBoardMode = JobBoardMode.ARCHIVE;

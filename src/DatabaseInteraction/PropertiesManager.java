@@ -93,6 +93,11 @@ public class PropertiesManager {
                 new PropertyConfig(COLUMN_REQUIRED_PROPERTIES_FILE_PATH, columnNameCol, isRequiredCol, "Required Column Properties")
         );
         for(PropertyConfig config : configs){
+
+            File f = new File(config.filePath);
+            if(!f.exists())
+                f.createNewFile();
+
             Properties props = new Properties();
             FileInputStream input = new FileInputStream(config.filePath);
             boolean propertiesChanged = false;
@@ -160,7 +165,20 @@ public class PropertiesManager {
         dropdownOptionProps.store(output, "Dropdown Options Lists");
     }
 
-    public static void loadUserPreferences(){
+    public static void loadUserPreferences() throws IOException {
+
+        File f = new File(USER_PREF_PROPERTIES_FILE_PATH);
+        if(!f.exists()) {
+            System.out.println("doesnt exist");
+            f.createNewFile();
+            String columnOrderString = "jwo,customer,po_date,cust_po,job_name,del,due_date,shops_submit,shops_app,finish_sample_submit,finish_sample_app,in_shop,mechanic,sub,finishing,build,finish,install,is_active";
+
+            Properties userPrefProps = new Properties();
+            userPrefProps.setProperty("column.order", columnOrderString);
+            OutputStream output = new FileOutputStream(USER_PREF_PROPERTIES_FILE_PATH);
+            userPrefProps.store(output, "User Preferences");
+        }
+
         Properties props = new Properties();
         try(FileInputStream input = new FileInputStream(USER_PREF_PROPERTIES_FILE_PATH)){
             props.load(input);
