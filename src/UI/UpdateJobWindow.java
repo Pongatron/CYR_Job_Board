@@ -34,7 +34,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
     ArrayList<String> requiredCols;
     private static final Color UPDATE_PANEL_COLOR = new Color(40, 40, 40);
 
-    public UpdateJobWindow(DatabaseInteraction db, ResultSet rs,String jwo){
+    public UpdateJobWindow(DatabaseInteraction db, ResultSet rs, String jwo){
         database = db;
         jobBoardResultSet = rs;
         selectedJwo = jwo;

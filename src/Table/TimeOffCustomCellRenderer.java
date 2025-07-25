@@ -33,7 +33,8 @@ public class TimeOffCustomCellRenderer extends DefaultTableCellRenderer {
     @Override
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
         JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-        //cellBorder = new EmptyBorder((int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()));
+//        cellBorder = new EmptyBorder(0,0,0,0);
+//        label.setBorder(cellBorder);
 
         if(table.getColumnName(column).contains("Mon"))
             colIndex = column;

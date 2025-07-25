@@ -2,11 +2,15 @@ package UI;
 
 import DatabaseInteraction.*;
 import Table.*;
+import org.postgresql.PGConnection;
+import org.postgresql.PGNotification;
 
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -22,9 +26,13 @@ import java.util.ArrayList;
 import java.util.EventObject;
 import java.util.Properties;
 
+import static DatabaseInteraction.DatabaseInteraction.*;
 import static DatabaseInteraction.Filter.FilterStatus.*;
 
-public class MainWindow extends JFrame implements ActionListener, MouseListener {
+public class MainWindow extends JFrame implements ActionListener {
+
+    public enum JobBoardMode {ACTIVE_JOBS, ARCHIVE}
+
 
     private static  int ABSOLUTE_MIN_CELL_WIDTH = 50;
     private static  int MAX_CELL_WIDTH = 400;
@@ -36,6 +44,11 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private static  Font BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
     private static  Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 15);
 
+    float currentZoom = ZoomManager.getZoom();
+    int zoomedDateCellWidth = (int)(30 * currentZoom);
+    int zoomedCellBuffer = (int)(8 * currentZoom);
+
+    public JobBoardMode currentBoardMode = JobBoardMode.ACTIVE_JOBS;
     private final DatabaseInteraction database;
     private ResultSet jobBoardResultSet;
     private ResultSet customerListResultSet;
@@ -65,6 +78,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     private JSplitPane splitPane;
     public static int totalWidth;
     private int todayCol = -1;
+    private boolean isArchiveHidden = false;
 
     ArrayList<Integer> visibleIndexes = new ArrayList<>();
 
@@ -72,13 +86,15 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     DefaultTableModel datesTableModel;
 
     public MainWindow() throws Exception{
-
         database = new DatabaseInteraction();
-        updateDimensions();
+        refreshResultSets("due_date");
         initializeComponents();
         syncScrollPanes();
-        refreshResultSets();
         loadTable();
+        resetDatesScrollBar();
+
+
+
 
         buttonPanel.add(addJobButton);
         buttonPanel.add(updateJobButton);
@@ -105,7 +121,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         this.add(centerPanel, BorderLayout.CENTER);
         this.add(topContainerPanel, BorderLayout.NORTH);
-//        this.add(splitPane, BorderLayout.CENTER);
 
         this.addWindowListener(new WindowAdapter() {
             @Override
@@ -123,11 +138,83 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         this.pack();
         this.setLocationRelativeTo(null);
         this.setVisible(true);
+
+
+    }
+
+    private static String channel = "table_update";
+    private static boolean running = true;
+
+    public static void listenToDatabase(){
+        Thread listenerThread = new Thread(() -> {
+            Connection conn = null; // Declare outside try-with-resources to use in finally
+            try {
+                conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+                PGConnection pgconn = conn.unwrap(PGConnection.class);
+
+                if (pgconn == null) {
+                    System.err.println("Not a PostgreSQL connection or cannot unwrap to PGConnection.");
+                    return;
+                }
+
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("LISTEN " + channel);
+                    System.out.println("Listening for notifications on channel: " + channel);
+                }
+
+                while (running) {
+                    // Option 1: Using the connection's wait method (more efficient)
+                    // This will block until a notification arrives or the timeout occurs
+                    // You need to synchronize on the connection object itself
+                    synchronized (conn) {
+                        conn.wait(5000); // Wait for up to 5 seconds for a notification
+                        // If 0, it waits indefinitely until notified
+                    }
+
+                    // Option 2: Polling with a sleep (less efficient but often simpler to get working initially)
+                    // You only need this if conn.wait() isn't working or you prefer it.
+                    // If no notifications, you need to sleep to prevent busy-waiting.
+                    // This line would go outside the `if (notifications != null)` block if you use it.
+                    // Thread.sleep(500); // Sleep for 500ms if no notifications received
+
+                    PGNotification[] notifications = pgconn.getNotifications();
+
+                    if (notifications != null && notifications.length > 0) {
+//                        for (PGNotification notification : notifications) {
+//                            System.out.println("NOTIFICATION: Channel=" + notification.getName() +
+//                                    ", Payload=" + notification.getParameter() +
+//                                    ", PID=" + notification.getPID());
+//
+//                            // Execute UI update on the Event Dispatch Thread (EDT)
+//
+//                        }
+                        SwingUtilities.invokeLater(()->{});
+                    }
+                    // If using Thread.sleep(), it would go here for Option 2.
+                }
+            } catch (SQLException e) {
+                System.err.println("Database connection error or LISTEN/NOTIFY issue: " + e.getMessage());
+                e.printStackTrace();
+                // IMPORTANT: Implement reconnect/retry logic here for robustness
+                try { Thread.sleep(5000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.out.println("Listener thread interrupted.");
+            } finally {
+                // Ensure the connection is closed even if an exception occurs
+                if (conn != null) {
+                    try { conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+                }
+                System.out.println("PostgreSQL Listener stopped.");
+            }
+        }, "Postgres-Listener-Thread"); // Give your thread a name for easier debugging
+        listenerThread.setDaemon(true); // Make it a daemon thread so it doesn't prevent JVM exit
+        listenerThread.start();
     }
 
     public void initializeComponents(){
         dataTable = new JTable();
-        dataTable.getTableHeader().addMouseListener(this);
+        //dataTable.getTableHeader().addMouseListener(this);
         dataTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         dataTable.setDefaultEditor(Object.class, null);
         dataTable.getTableHeader().setReorderingAllowed(false);
@@ -136,7 +223,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         dataTable.setFont(new Font(dataTable.getFont().getFontName(), Font.PLAIN, 30));
 
         datesTable = new JTable();
-        datesTable.getTableHeader().addMouseListener(this);
+        //datesTable.getTableHeader().addMouseListener(this);
         datesTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         datesTable.setDefaultEditor(Object.class, null);
         datesTable.getTableHeader().setReorderingAllowed(false);
@@ -147,7 +234,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         datesTable.setBackground(new Color(24,24,24));
 
         timeOffTable = new JTable();
-        timeOffTable.getTableHeader().addMouseListener(this);
+        //timeOffTable.getTableHeader().addMouseListener(this);
         timeOffTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         timeOffTable.setDefaultEditor(Object.class, null);
         timeOffTable.getTableHeader().setReorderingAllowed(false);
@@ -295,9 +382,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         splitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, new PropertyChangeListener() {
             @Override
             public void propertyChange(PropertyChangeEvent evt) {
-
                 if(evt.getPropertyName().equals(JSplitPane.DIVIDER_LOCATION_PROPERTY)) {
-
                     SwingUtilities.invokeLater(()->{
                         timeOffScroll.setPreferredSize(new Dimension(datesScroll.getWidth(), timeOffTable.getPreferredSize().height));
                         timeOffScroll.revalidate();
@@ -312,17 +397,43 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
     }
 
     public void loadTable()  throws SQLException{
-
         dataTableModel = new DefaultTableModel();
         datesTableModel = new DefaultTableModel();
         createDataTable();
         createDatesTable();
-        setTableFontsAndSizes();
         populateDatesTable();
-        resetDatesScrollBar();
         populateTimeOffTable();
+        setTableFontsAndSizes();
+        setDividerLocation();
+        applyZoom();
+    }
 
-        database.closeResources();
+    public void refreshData(String filter){
+        refreshResultSets(filter);
+        try {
+            loadTable();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void refreshResultSets(String filter){
+        String isActiveValue = "true";
+        if(currentBoardMode == JobBoardMode.ARCHIVE){
+            isActiveValue = "false";
+        }
+
+        SelectQueryBuilder qbJobBoard = new SelectQueryBuilder();
+        qbJobBoard.select("*");
+        qbJobBoard.from("job_board");
+        qbJobBoard.where("is_active = "+isActiveValue);
+        qbJobBoard.orderBy(new Filter(filter, ASC));
+        jobBoardResultSet = database.sendSelect(qbJobBoard.build());
+
+        SelectQueryBuilder qbCustomerList = new SelectQueryBuilder();
+        qbCustomerList.select("*");
+        qbCustomerList.from("customer_list");
+        customerListResultSet = database.sendSelect(qbCustomerList.build());
     }
 
     public void createDataTable() throws SQLException{
@@ -346,9 +457,8 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
             for (int i = 0; i < visibleIndexes.size(); i++) {
                 int databaseIndex = visibleIndexes.get(i);
-                //System.out.println("database: "+databaseIndex+" table: "+i);
                 Object item = jobBoardResultSet.getObject(databaseIndex);
-                if (item instanceof java.sql.Date) {
+                if (item instanceof Date) {
                     LocalDate cellDate = ((Date) item).toLocalDate();
                     row[i] = cellDate;
                 }
@@ -360,108 +470,9 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             datesTableModel.addRow(emptyRow);
         }
         jobBoardResultSet.beforeFirst();
-
-
         dataTable.setModel(dataTableModel);
-        try {
-            setEditableAndDropdownColumns(visibleIndexes);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
         //-------------------
     }
-
-    public void setEditableAndDropdownColumns(ArrayList<Integer> visibleIndexes) throws IOException, SQLException {
-        Properties props = new Properties();
-        FileInputStream input = new FileInputStream(PropertiesManager.CELL_EDITABLE_PROPERTIES_FILE_PATH);
-        props.load(input);
-
-        for(int i = 0; i < dataTableModel.getColumnCount(); i++){
-            String columnLabel = jobBoardResultSet.getMetaData().getColumnLabel(visibleIndexes.get(i));
-            String isEditable = props.getProperty(columnLabel);
-
-            if("t".equals(isEditable)){
-                JTextField editorField = new JTextField();
-                editorField.setBackground(new Color(24, 24, 24));
-                editorField.setForeground(new Color(255,255,255));
-                editorField.setFont(PLAIN_FONT);
-                editorField.setBorder(new LineBorder(Color.GREEN, 2));
-                editorField.setCaretPosition(editorField.getText().length());
-                editorField.setCaretColor(new Color(255,255,255));
-
-                final boolean[] enterPressed = {false};
-                final int[] currentRow = {0};
-                final int[] currentCol = {0};
-                final String[] currentValue = {""};
-                DefaultCellEditor editor = new DefaultCellEditor(editorField){
-                    @Override
-                    public boolean isCellEditable(EventObject anEvent) {
-                        return super.isCellEditable(anEvent);
-                    }
-
-                    @Override
-                    public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
-                        currentRow[0] = row;
-                        currentCol[0] = column;
-                        currentValue[0] = value != null ? value.toString() : "";
-
-                        SwingUtilities.invokeLater(()->{
-                            editorField.setCaretPosition(editorField.getText().length());
-                        });
-
-                        return super.getTableCellEditorComponent(table, value, isSelected, row, column);
-                    }
-                    @Override
-                    public boolean stopCellEditing() {
-                        if (enterPressed[0]) {
-                            UpdateQueryBuilder qb = new UpdateQueryBuilder();
-                            qb.updateTable("job_board");
-                            try {
-                                qb.setColNames(jobBoardResultSet.getMetaData().getColumnLabel(currentCol[0]+1));
-                                qb.setValues(editorField.getText());
-                                TableColumn targetColumn = dataTable.getColumn("jwo");
-                                TableColumnModel columnModel = dataTable.getColumnModel();
-                                int columnIndex = columnModel.getColumnIndex(targetColumn.getIdentifier());
-                                qb.where("jwo = "+ dataTable.getValueAt(currentRow[0], columnIndex));
-                                database.sendUpdate(qb.build());
-                            } catch (SQLException e) {
-                                enterPressed[0] = false;
-                                throw new RuntimeException(e);
-                            }
-                            enterPressed[0] = false;
-                            refreshResultSets();
-                            try {
-                                loadTable();
-                            } catch (SQLException e) {
-                                enterPressed[0] = false;
-                                throw new RuntimeException(e);
-                            }
-                            setDividerLocation();
-                            return super.stopCellEditing();
-                        } else {
-                            cancelCellEditing(); // Explicitly cancel if Enter wasn't pressed
-                            return false; // Indicate that editing was not successfully stopped (committed)
-                        }
-                    }
-
-                    @Override
-                    public void cancelCellEditing() {
-                        System.out.println("Canceling cell editing.");
-                        super.cancelCellEditing();
-                    }
-                };
-                editor.setClickCountToStart(1);
-                editorField.addActionListener(e -> {
-                    enterPressed[0] = true;
-                    editor.stopCellEditing();
-                });
-                // Assign the editor to the column
-                dataTable.getColumnModel().getColumn(i).setCellEditor(editor);
-            }
-        }
-
-    }
-
 
     public void createDatesTable() throws SQLException {
         //--------------------------- create dates table
@@ -472,7 +483,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         LocalDate currentDate = oneYearAgo;
         ArrayList<LocalDate> saturdayList = new ArrayList<>();
 
-        DefaultTableModel tm = new DefaultTableModel();
+        DefaultTableModel timeOffTableModel = new DefaultTableModel();
 
         while(jobBoardResultSet.next()){
             Date sqlDate = jobBoardResultSet.getDate("due_date");
@@ -491,13 +502,13 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                     for(LocalDate d : saturdayList){
                         if(d.equals(currentDate)) {
                             datesTableModel.addColumn(currentDate.format(dateFormat));
-                            tm.addColumn(currentDate.format(dateFormat));
+                            timeOffTableModel.addColumn(currentDate.format(dateFormat));
                         }
                     }
                 }
                 else {
                     datesTableModel.addColumn(currentDate.format(dateFormat));
-                    tm.addColumn(currentDate.format(dateFormat));
+                    timeOffTableModel.addColumn(currentDate.format(dateFormat));
                 }
                 if(currentDate.isEqual(today)){
                     todayCol = datesTableModel.getColumnCount() - 1;
@@ -505,16 +516,15 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             }
             else if(currentDate.isEqual(today)){
                 datesTableModel.addColumn(currentDate.format(dateFormat));
-                tm.addColumn(currentDate.format(dateFormat));
+                timeOffTableModel.addColumn(currentDate.format(dateFormat));
                 todayCol = datesTableModel.getColumnCount() - 1;
             }
 
             currentDate = currentDate.plusDays(1);
         }
         datesTable.setModel(datesTableModel);
-        tm.addRow(new Object[visibleIndexes.size()]);
-        System.out.println(tm.getRowCount());
-        timeOffTable.setModel(tm);
+        timeOffTableModel.addRow(new Object[visibleIndexes.size()]);
+        timeOffTable.setModel(timeOffTableModel);
         timeOffTable.setTableHeader(null);
         //------------------------------
     }
@@ -530,6 +540,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         // calculate each column width and set it as the preferred size so nothing looks cut off
         totalWidth = 0;
         int minHeight = 0;
+        int rowHeight = zoomedDateCellWidth;
         for(int col = 0; col < dataTable.getColumnCount(); col++){
             TableColumn column = dataTable.getColumnModel().getColumn(col);
             TableCellRenderer headerRenderer = dataTable.getTableHeader().getDefaultRenderer();
@@ -540,21 +551,32 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             for(int row = 0; row < dataTable.getRowCount(); row++){
                 TableCellRenderer cellRenderer = dataTable.getCellRenderer(row, col);
                 Component comp = dataTable.prepareRenderer(cellRenderer, row, col);
-                int cellWidth = comp.getPreferredSize().width;
+
+                FontMetrics fm = comp.getFontMetrics(PLAIN_FONT);
+                String cellText = dataTable.getValueAt(row, col) != null ? dataTable.getValueAt(row, col).toString() : "";
+
+                Border border = ((JComponent)comp).getBorder();
+                Insets borderInsets = border.getBorderInsets(comp);
+
+                int textWidth = fm.stringWidth(cellText) + borderInsets.left + borderInsets.right + zoomedCellBuffer;
+                int cellWidth = textWidth;
+                if(headerComp.getText().contains("date"))
+                    cellWidth = comp.getPreferredSize().width;
                 if(cellWidth < MAX_CELL_WIDTH)
-                    minWidth = Math.max(minWidth, cellWidth + (int)(8 * ZoomManager.getZoom()));
+                    minWidth = Math.max(minWidth, cellWidth + zoomedCellBuffer);
                 else
                     minWidth = MAX_CELL_WIDTH;
             }
             if(headerComp.getPreferredSize().width > minWidth && !headerComp.getText().contains("html")){
                 column.setHeaderRenderer(new RotatedHeaderRenderer(dataTable));
-                minWidth = Math.max(minWidth, headerComp.getPreferredSize().height + (int)(8 * ZoomManager.getZoom()));
+                minWidth = Math.max(minWidth, headerComp.getPreferredSize().height + zoomedCellBuffer);
             }
             else{
                 column.setHeaderRenderer(new TableHeaderCustomCellRenderer(dataTable));
-                minWidth = Math.max(minWidth, headerComp.getPreferredSize().width + (int)(8 * ZoomManager.getZoom()));
+                minWidth = Math.max(minWidth, headerComp.getPreferredSize().width + zoomedCellBuffer);
             }
 
+            minWidth += (int)(5*currentZoom);
             column.setPreferredWidth(minWidth);
             column.setMaxWidth(MAX_CELL_WIDTH);
             column.setMinWidth(minWidth);
@@ -568,54 +590,79 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         // set datesTable cell sizes
         for (int i = 0; i < datesTable.getColumnModel().getColumnCount(); i++) {
-            datesTable.getColumnModel().getColumn(i).setMinWidth((int)(30 * ZoomManager.getZoom()));
-            datesTable.getColumnModel().getColumn(i).setMaxWidth((int)(30 * ZoomManager.getZoom()));
-            datesTable.getColumnModel().getColumn(i).setPreferredWidth((int)(30 * ZoomManager.getZoom()));
-            timeOffTable.getColumnModel().getColumn(i).setMinWidth((int)(30 * ZoomManager.getZoom()));
-            timeOffTable.getColumnModel().getColumn(i).setMaxWidth((int)(30 * ZoomManager.getZoom()));
-            timeOffTable.getColumnModel().getColumn(i).setPreferredWidth((int)(30 * ZoomManager.getZoom()));
+            datesTable.getColumnModel().getColumn(i).setMinWidth(zoomedDateCellWidth);
+            datesTable.getColumnModel().getColumn(i).setMaxWidth(zoomedDateCellWidth);
+            datesTable.getColumnModel().getColumn(i).setPreferredWidth(zoomedDateCellWidth);
+            timeOffTable.getColumnModel().getColumn(i).setMinWidth(zoomedDateCellWidth);
+            timeOffTable.getColumnModel().getColumn(i).setMaxWidth(zoomedDateCellWidth);
+            timeOffTable.getColumnModel().getColumn(i).setPreferredWidth(zoomedDateCellWidth);
             TableColumn column = datesTable.getColumnModel().getColumn(i);
             TableCellRenderer headerRenderer = datesTable.getTableHeader().getDefaultRenderer();
             Component headerComp = headerRenderer.getTableCellRendererComponent(datesTable, column.getHeaderValue(), false, false, -1, i);
             minHeight = Math.max(minHeight, headerComp.getPreferredSize().width);
         }
-
-
-
-
         // set both tables preferred sizes
-
         dataTable.getTableHeader().setPreferredSize(new Dimension(dataTable.getTableHeader().getPreferredSize().width, minHeight));
         datesTable.getTableHeader().setPreferredSize(new Dimension(datesTable.getTableHeader().getPreferredSize().width, minHeight));
 
-        dataTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
-        datesTable.setRowHeight((int)(30 * ZoomManager.getZoom()));
-        timeOffTable.setRowHeight((int)(70 * ZoomManager.getZoom()));
-//        centerPanel.setMinimumSize(new Dimension(totalWidth, 0));
-//        datesScroll.setMinimumSize(new Dimension(totalWidth, 0));
+        int zoomedCellHeight = (int)(30 * ZoomManager.getZoom());
+        dataTable.setRowHeight(rowHeight);
+        datesTable.setRowHeight(rowHeight);
+        timeOffTable.setRowHeight(zoomedDateCellWidth * 2);
+    }
 
-//        timeOffScroll.setPreferredSize(new Dimension((int)( 1/ZoomManager.getZoom() * splitPane.getRightComponent().getPreferredSize().width), 50));
-//        timeOffScroll.revalidate();
-//        timeOffScroll.repaint();
-//        topTablePanel.revalidate();
-//        topTablePanel.repaint();
+    public void applyZoom(){
+        currentZoom = ZoomManager.getZoom();
+
+        zoomedDateCellWidth = (int)(30 * currentZoom);
+        zoomedCellBuffer = (int)(8 * currentZoom);
+        BASE_FONT_SIZE = (int)(15 * currentZoom);
+        PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
+        BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
+        MAX_CELL_WIDTH = (int)(300 * currentZoom);
+
+        dataTable.setFont(PLAIN_FONT);
+        dataTable.getTableHeader().setFont(BOLD_FONT);
+        datesTable.setFont(PLAIN_FONT);
+        datesTable.getTableHeader().setFont(BOLD_FONT);
+        timeOffTable.setFont(PLAIN_FONT);
+        //timeOffTable.getTableHeader().setFont(BOLD_FONT);
+
+        addJobButton.setFont(BUTTON_FONT);
+        updateJobButton.setFont(BUTTON_FONT);
+        deleteButton.setFont(BUTTON_FONT);
+        jwoFilterButton.setFont(BUTTON_FONT);
+        customerFilterButton.setFont(BUTTON_FONT);
+        dateFilterButton.setFont(BUTTON_FONT);
+        todayButton.setFont(BUTTON_FONT);
+        resetViewButton.setFont(BUTTON_FONT);
+        archiveButton.setFont(BUTTON_FONT);
+        timeOffButton.setFont(BUTTON_FONT);
+        plusZoomButton.setFont(BUTTON_FONT);
+        minusZoomButton.setFont(BUTTON_FONT);
+
+        setTableFontsAndSizes();
+        setTableFontsAndSizes();
+        this.revalidate();
+        this.repaint();
+        setTableFontsAndSizes();
+
+
+        setDividerLocation();
+        syncScrollPanes();
+        resetDatesScrollBar();
     }
 
     // Populate dates table with colored days
     public void populateDatesTable() throws SQLException {
-        // TODO find a way to get column index without exact number
-
-
         ArrayList<DateRange> dates = new ArrayList<>();
         int buildIndex = 1;
         int finishIndex = 1;
         int installIndex = 1;
-        int dueDateColumn = 1;
         while(jobBoardResultSet.next()){
             buildIndex = jobBoardResultSet.findColumn("build");
             finishIndex = jobBoardResultSet.findColumn("finish");
             installIndex = jobBoardResultSet.findColumn("install");
-            dueDateColumn = jobBoardResultSet.findColumn("due_date");
 
             Date sqlDate = jobBoardResultSet.getDate("due_date");
             LocalDate dueDate = sqlDate.toLocalDate();
@@ -628,10 +675,7 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
             int daysForward = installDays - 1;
 
             // check if the due date is a saturday
-            boolean isDueDateSaturday = false;
-            if (dueDate.getDayOfWeek() == DayOfWeek.SATURDAY) {
-                isDueDateSaturday = true;
-            }
+            boolean isDueDateSaturday = (dueDate.getDayOfWeek() == DayOfWeek.SATURDAY);
 
             // calculate what the start/end date for all sections of time
             // this calculation will only count weekdays as working days unless the due date is a saturday
@@ -706,7 +750,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         // Apply the dates for each time period to the custom renderer so it can draw the colored squares
         TableCustom.applyDates(datesTable, dates);
-        //populateTimeOffTable();
     }
 
     public void populateTimeOffTable() throws SQLException {
@@ -718,21 +761,17 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         ArrayList<TimeOffDates> timeOffDatesList = new ArrayList<>();
 
         int personIndex = 1;
-        int startDateIndex = 1;
-        int endDateIndex = 1;
         while(rs.next()){
             personIndex = rs.findColumn("worker");
-            startDateIndex = rs.findColumn("start_date");
-            endDateIndex = rs.findColumn("end_date");
 
             Date sqlDate = rs.getDate("start_date");
             LocalDate startDate = sqlDate.toLocalDate();
+
             sqlDate = rs.getDate("end_date");
             LocalDate endDate = sqlDate.toLocalDate();
 
             ArrayList<LocalDate> timeOffDates = new ArrayList<>();
             LocalDate currentDate = startDate;
-
 
             while(currentDate.isBefore(endDate)){
                 if(currentDate.getDayOfWeek() != DayOfWeek.SATURDAY && currentDate.getDayOfWeek() != DayOfWeek.SUNDAY){
@@ -741,7 +780,6 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
                 currentDate = currentDate.plusDays(1);
             }
             timeOffDates.add(currentDate);
-
             timeOffDatesList.add(new TimeOffDates(rs.getString(personIndex), timeOffDates));
         }
         TableCustom.applyTimeOffDates(timeOffTable, timeOffDatesList);
@@ -790,40 +828,228 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         }
     }
 
-    public void updateDimensions(){
-        ABSOLUTE_MIN_CELL_WIDTH = (int)(50 * ZoomManager.getZoom());
-        MAX_CELL_WIDTH = (int)(300 * ZoomManager.getZoom());
-        BASE_FONT_SIZE = (int)(15 * ZoomManager.getZoom());
-        TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
-        BUTTON_PANEL_PREF_SIZE = new Dimension(400, 70);
-        TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
-        PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
-        BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
-    }
 
-    public void refreshTable() {
 
-    }
 
-    public void refreshResultSets(){
-        SelectQueryBuilder qbJB = new SelectQueryBuilder();
-        qbJB.select("*");
-        qbJB.from("job_board");
-        qbJB.where("is_active = true");
-        qbJB.orderBy(new Filter("due_date", ASC));
-        SelectQueryBuilder qbCL = new SelectQueryBuilder();
-        qbCL.select("*");
-        qbCL.from("customer_list");
-        jobBoardResultSet = database.sendSelect(qbJB.build());
-        customerListResultSet = database.sendSelect(qbCL.build());
-    }
 
-    public void createDropdown(String columnName){
 
-    }
 
     public void setDividerLocation(){
         splitPane.setDividerLocation(totalWidth);
+    }
+
+    public void setEditableAndDropdownColumns(ArrayList<Integer> visibleIndexes) throws IOException, SQLException {
+        Properties editableProps = new Properties();
+        FileInputStream editableInput = new FileInputStream(PropertiesManager.CELL_EDITABLE_PROPERTIES_FILE_PATH);
+        editableProps.load(editableInput);
+
+        Properties dropdownProps = new Properties();
+        FileInputStream dropdownInput = new FileInputStream(PropertiesManager.CELL_DROPDOWN_PROPERTIES_FILE_PATH);
+        dropdownProps.load(dropdownInput);
+
+        Properties dropdownListProps = new Properties();
+        FileInputStream dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+        dropdownListProps.load(dropdownListInput);
+
+        DefaultCellEditor editor = null;
+
+        jobBoardResultSet.beforeFirst();
+        for(int i = 0; i < dataTableModel.getColumnCount(); i++){
+            String columnLabel = jobBoardResultSet.getMetaData().getColumnLabel(visibleIndexes.get(i));
+            String isEditableValue = editableProps.getProperty(columnLabel);
+            String isDropdownValue = dropdownProps.getProperty(columnLabel);
+            JComponent text = new JComponent(){};
+
+            if("t".equals(isEditableValue)){
+                JTextField editorField = new JTextField();
+                editorField.setBackground(new Color(24, 24, 24));
+                editorField.setForeground(new Color(255,255,255));
+                editorField.setFont(PLAIN_FONT);
+                editorField.setBorder(new LineBorder(Color.GREEN, 2));
+                editorField.setCaretPosition(editorField.getText().length());
+                editorField.setCaretColor(new Color(255,255,255));
+
+                final boolean[] enterPressed = {false};
+                final int[] currentRow = {0};
+                final int[] currentCol = {0};
+                final String[] currentValue = {""};
+                editor = new DefaultCellEditor(editorField){
+                    @Override
+                    public boolean isCellEditable(EventObject anEvent) {
+                        return super.isCellEditable(anEvent);
+                    }
+
+                    @Override
+                    public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+                        currentRow[0] = row;
+                        currentCol[0] = column;
+                        currentValue[0] = value != null ? value.toString() : "";
+
+                        SwingUtilities.invokeLater(()->{
+                            editorField.setCaretPosition(editorField.getText().length());
+                        });
+
+                        return super.getTableCellEditorComponent(table, value, isSelected, row, column);
+                    }
+                    @Override
+                    public boolean stopCellEditing() {
+                        if (enterPressed[0]) {
+                            UpdateQueryBuilder qb = new UpdateQueryBuilder();
+                            qb.updateTable("job_board");
+                            try {
+                                qb.setColNames(dataTable.getColumnName(currentCol[0]).replace(" ", "_"));
+                                qb.setValues(editorField.getText());
+                                TableColumn targetColumn = dataTable.getColumn("jwo");
+                                TableColumnModel columnModel = dataTable.getColumnModel();
+                                int columnIndex = columnModel.getColumnIndex(targetColumn.getIdentifier());
+                                qb.where("jwo = "+ dataTable.getValueAt(currentRow[0], columnIndex));
+                                database.sendUpdate(qb.build());
+                            } catch (SQLException e) {
+                                enterPressed[0] = false;
+                                throw new RuntimeException(e);
+                            }
+                            enterPressed[0] = false;
+                            try {
+                                loadTable();
+                            } catch (SQLException e) {
+                                enterPressed[0] = false;
+                                throw new RuntimeException(e);
+                            }
+                            setDividerLocation();
+                            return super.stopCellEditing();
+                        } else {
+                            cancelCellEditing(); // Explicitly cancel if Enter wasn't pressed
+                            return false; // Indicate that editing was not successfully stopped (committed)
+                        }
+                    }
+
+                    @Override
+                    public void cancelCellEditing() {
+                        super.cancelCellEditing();
+                    }
+                };
+                editor.setClickCountToStart(1);
+                DefaultCellEditor finalEditor = editor;
+                editorField.addActionListener(e -> {
+                    enterPressed[0] = true;
+                    finalEditor.stopCellEditing();
+                });
+                // Assign the editor to the column
+                text = editorField;
+            }
+            else if("t".equals(isDropdownValue)){
+                String columnName = columnLabel;
+                if(columnLabel.equals("mechanic"))
+                    columnName = "worker";
+                String dropdownList = dropdownListProps.getProperty(columnName + "_list.dropdown.options");
+                if(dropdownList == null)
+                    dropdownList = ",none";
+
+                JComboBox comboBox = new JComboBox<>(dropdownList.split(","));
+                Component editorComp = comboBox.getEditor().getEditorComponent();
+
+                if(editorComp instanceof JTextField textField){
+                    textField.setPreferredSize(new Dimension(200, 30));
+                    textField.setCaretColor(Color.white);
+                    textField.setBackground(new Color(60, 60, 60));
+                    textField.setForeground(Color.WHITE);
+                    textField.setFont(PLAIN_FONT);
+                    textField.setBorder(new EmptyBorder(0,0,0,0));
+                }
+
+                comboBox.setPreferredSize(new Dimension(200, 30));
+                comboBox.setEditable(true);
+                comboBox.setBackground(new Color(60, 60, 60));
+                comboBox.setForeground(Color.WHITE);
+                comboBox.setFont(PLAIN_FONT);
+                comboBox.setBorder(new EmptyBorder(5, 5, 5, 5));
+                comboBox.setMaximumRowCount(5);
+
+
+                final boolean[] enterPressed = {false};
+                final int[] currentRow = {0};
+                final int[] currentCol = {0};
+                final String[] currentValue = {""};
+                editor = new DefaultCellEditor(comboBox){
+                    @Override
+                    public boolean isCellEditable(EventObject anEvent) {
+                        return super.isCellEditable(anEvent);
+                    }
+
+                    @Override
+                    public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+                        currentRow[0] = row;
+                        currentCol[0] = column;
+                        currentValue[0] = value != null ? value.toString() : "";
+                        enterPressed[0] = false;
+
+//                        SwingUtilities.invokeLater(()->{
+//                            comboBox.setCaretPosition(comboBox.getText().length());
+//                        });
+
+                        return super.getTableCellEditorComponent(table, value, isSelected, row, column);
+                    }
+                    @Override
+                    public boolean stopCellEditing() {
+                        if (enterPressed[0]) {
+                            UpdateQueryBuilder qb = new UpdateQueryBuilder();
+                            qb.updateTable("job_board");
+                            try {
+                                qb.setColNames(dataTable.getColumnName(currentCol[0]).replace(" ", "_"));
+                                qb.setValues(comboBox.getEditor().getItem().toString());
+                                TableColumn targetColumn = dataTable.getColumn("jwo");
+                                TableColumnModel columnModel = dataTable.getColumnModel();
+                                int columnIndex = columnModel.getColumnIndex(targetColumn.getIdentifier());
+                                qb.where("jwo = "+ dataTable.getValueAt(currentRow[0], columnIndex));
+                                database.sendUpdate(qb.build());
+                                loadTable();
+                                setDividerLocation();
+                                return super.stopCellEditing();
+                            } catch (SQLException e) {
+                                enterPressed[0] = false;
+                                throw new RuntimeException(e);
+                            }
+                        } else if(!enterPressed[0]){
+                            return super.stopCellEditing();
+                            // Explicitly cancel if Enter wasn't pressed
+                            //return false; // Indicate that editing was not successfully stopped (committed)
+                        }
+                        return super.stopCellEditing();
+                    }
+                };
+                editor.setClickCountToStart(1);
+                DefaultCellEditor finalEditor = editor;
+//                comboBox.addActionListener(e -> {
+//                    enterPressed[0] = true;
+//                    finalEditor.stopCellEditing();
+//                });
+                comboBox.addPopupMenuListener(new PopupMenuListener() {
+                    private Object previousSelection = null;
+                    @Override
+                    public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                        previousSelection = comboBox.getSelectedItem();
+                    }
+
+                    @Override
+                    public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                        Object currentSelection = comboBox.getSelectedItem();
+                        if (currentSelection != null && !currentSelection.equals(previousSelection)) {
+                            enterPressed[0] = true;
+                            finalEditor.stopCellEditing();
+                        }
+                    }
+
+                    @Override
+                    public void popupMenuCanceled(PopupMenuEvent e) {
+                        enterPressed[0] = false;
+                    }
+                });
+                text = comboBox;
+            }
+
+            dataTable.getColumnModel().getColumn(i).setCellEditor(editor);
+        }
+
     }
 
     @Override
@@ -834,104 +1060,38 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
         if(e.getSource() == updateJobButton){
             int selectedRow = dataTable.getSelectedRow();
             if(selectedRow != -1) {
-                String selectedJwo = dataTable.getValueAt(selectedRow, 0).toString();
+                String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
                 new UpdateJobWindow(database, jobBoardResultSet, selectedJwo);
             }
         }
         if(e.getSource() == deleteButton){
             int selectedRow = dataTable.getSelectedRow();
             if(selectedRow != -1) {
-                String selectedJwo = dataTable.getValueAt(selectedRow, 0).toString();
+                String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
                 new DeleteJobWindow(selectedJwo);
             }
         }
         if(e.getSource() == jwoFilterButton){
-            SelectQueryBuilder qb = new SelectQueryBuilder();
-            qb.select("*");
-            qb.from("job_board");
-            Filter f = new Filter("jwo", DESC);
-            qb.orderBy(f);
-            try {
-                refreshResultSets();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
+            refreshData("jwo");
         }
         if(e.getSource() == customerFilterButton){
-            SelectQueryBuilder qb = new SelectQueryBuilder();
-            qb.select("*");
-            qb.from("job_board");
-            Filter f = new Filter("customer", ASC);
-            qb.orderBy(f);
-            try {
-                refreshResultSets();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
+            refreshData("customer");
         }
         if(e.getSource() == dateFilterButton){
-            SelectQueryBuilder qb = new SelectQueryBuilder();
-            qb.select("*");
-            qb.from("job_board");
-            Filter f = new Filter("due_date", DESC);
-            qb.orderBy(f);
-            try {
-                refreshResultSets();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
+            refreshData("due_date");
         }
         if(e.getSource() == todayButton) {
             resetDatesScrollBar();
         }
         if(e.getSource() == resetViewButton) {
-            setDividerLocation();
-            //dataTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-            refreshResultSets();
 
-            try {
-                setEditableAndDropdownColumns(visibleIndexes);
-                loadTable();
-            } catch (SQLException ex) {
-                throw new RuntimeException(ex);
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
-            }
+            currentBoardMode = JobBoardMode.ACTIVE_JOBS;
+            refreshData("due_date");
+
         }
         if(e.getSource() == archiveButton) {
-//            setDividerLocation();
-//            SelectQueryBuilder qb = new SelectQueryBuilder();
-//            qb.select("*");
-//            qb.from("job_board");
-//            qb.where("is_active = false");
-//            SelectQueryBuilder qbCL = new SelectQueryBuilder();
-//            qbCL.select("*");
-//            qbCL.from("customer_list");
-//
-//            try {
-//                jobBoardResultSet = database.sendSelect(qb.build());
-//                customerListResultSet = database.sendSelect(qbCL.build());
-//                loadTable();
-//            } catch (SQLException ex) {
-//                ex.printStackTrace();
-//            }
-//
-//            dataTable.setSelectionModel(new DefaultListSelectionModel() {
-//                @Override
-//                public void setSelectionInterval(int index0, int index1) {
-//                    // Do nothing, effectively preventing selection
-//                }
-//
-//                @Override
-//                public void addSelectionInterval(int index0, int index1) {
-//                    // Do nothing
-//                }
-//
-//                @Override
-//                public void removeSelectionInterval(int index0, int index1) {
-//                    // Do nothing
-//                }
-//            });
+            currentBoardMode = JobBoardMode.ARCHIVE;
+            refreshData("due_date");
         }
 
         if(e.getSource() == timeOffButton){
@@ -940,66 +1100,12 @@ public class MainWindow extends JFrame implements ActionListener, MouseListener 
 
         if(e.getSource() == plusZoomButton) {
             ZoomManager.increaseZoom();
-            updateDimensions();
-            //refreshTable();
-            setTableFontsAndSizes();
-            setDividerLocation();
-            try {
-                setEditableAndDropdownColumns(visibleIndexes);
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
-            } catch (SQLException ex) {
-                throw new RuntimeException(ex);
-            }
-
-            SwingUtilities.invokeLater(()->{
-                //setTableFontsAndSizes();
-                resetDatesScrollBar();
-            });
+            applyZoom();
         }
         if(e.getSource() == minusZoomButton) {
             ZoomManager.decreaseZoom();
-            updateDimensions();
-            //refreshTable();
-            setTableFontsAndSizes();
-            setDividerLocation();
-            try {
-                setEditableAndDropdownColumns(visibleIndexes);
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
-            } catch (SQLException ex) {
-                throw new RuntimeException(ex);
-            }
-
-            SwingUtilities.invokeLater(()->{
-                //setTableFontsAndSizes();
-                resetDatesScrollBar();
-            });
+            applyZoom();
         }
     }
 
-    @Override
-    public void mouseClicked(MouseEvent e) {
-
-    }
-
-    @Override
-    public void mousePressed(MouseEvent e) {
-
-    }
-
-    @Override
-    public void mouseReleased(MouseEvent e) {
-
-    }
-
-    @Override
-    public void mouseEntered(MouseEvent e) {
-
-    }
-
-    @Override
-    public void mouseExited(MouseEvent e) {
-
-    }
 }

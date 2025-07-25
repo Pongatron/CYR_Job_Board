@@ -1,23 +1,28 @@
 package DatabaseInteraction;
 
+import org.postgresql.PGConnection;
+import org.postgresql.PGNotification;
+import org.postgresql.xa.PGXADataSource;
+
 import java.sql.*;
 
 public class DatabaseInteraction {
 
     private Connection connection;
-    private final String URL = "jdbc:postgresql://localhost:5432/postgres";
-    private final String USERNAME = "postgres";
-    private final String PASSWORD = "0000";
+    public static final String URL = "jdbc:postgresql://localhost:5432/postgres";
+    public static final String USERNAME = "postgres";
+    public static final String PASSWORD = "0000";
     private ResultSet rs = null;
     private PreparedStatement ps = null;
+
 
     public void createConnection(){
         try {
             connection = DriverManager.getConnection(URL, USERNAME, PASSWORD);
             System.out.println("Connection.isValid(0) = " + connection.isValid(0));
         } catch (SQLException ex){
-            closeConnection();
             ex.printStackTrace();
+            closeConnection();
         }
     }
     public void closeConnection(){
