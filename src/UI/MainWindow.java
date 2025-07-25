@@ -20,6 +20,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.*;
 import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -38,7 +40,7 @@ public class MainWindow extends JFrame implements ActionListener {
     private static  int MAX_CELL_WIDTH = 400;
     private static  int BASE_FONT_SIZE = 15;
     private static  Dimension TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
-    private static  Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(400, 50);
+    private static  Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(400, 70);
     private static  Dimension TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
     private static  Font PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
     private static  Font BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
@@ -94,6 +96,34 @@ public class MainWindow extends JFrame implements ActionListener {
         resetDatesScrollBar();
 
 
+        Thread databaseListenerThread = new Thread(()->{
+            try (Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/postgres", "postgres", "0000")) {
+
+                PGConnection pgconn = conn.unwrap(org.postgresql.PGConnection.class);
+                Statement stmt = conn.createStatement();
+                stmt.execute("LISTEN table_update");
+
+                System.out.println("Waiting for notification...");
+
+                while(true){
+                    PGNotification[] notifications = pgconn.getNotifications();
+                    if(notifications != null){
+                        for(PGNotification notification : notifications){
+                            System.out.println("Recieved: "+ notification.getParameter());
+                            SwingUtilities.invokeLater(()->{
+                                refreshData("due_date");
+                            });
+
+                        }
+                    }
+                    Thread.sleep(100);
+                }
+
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+        });
+        databaseListenerThread.start();
 
 
         buttonPanel.add(addJobButton);
@@ -537,9 +567,11 @@ public class MainWindow extends JFrame implements ActionListener {
         datesTable.setFont(PLAIN_FONT);
         timeOffTable.setFont(PLAIN_FONT);
 
+
+        Instant start = Instant.now();
+
         // calculate each column width and set it as the preferred size so nothing looks cut off
         totalWidth = 0;
-        int minHeight = 0;
         int rowHeight = zoomedDateCellWidth;
         for(int col = 0; col < dataTable.getColumnCount(); col++){
             TableColumn column = dataTable.getColumnModel().getColumn(col);
@@ -559,7 +591,7 @@ public class MainWindow extends JFrame implements ActionListener {
                 Insets borderInsets = border.getBorderInsets(comp);
 
                 int textWidth = fm.stringWidth(cellText) + borderInsets.left + borderInsets.right + zoomedCellBuffer;
-                int cellWidth = textWidth;
+                int cellWidth = comp.getPreferredSize().width;
                 if(headerComp.getText().contains("date"))
                     cellWidth = comp.getPreferredSize().width;
                 if(cellWidth < MAX_CELL_WIDTH)
@@ -582,30 +614,59 @@ public class MainWindow extends JFrame implements ActionListener {
             column.setMinWidth(minWidth);
             totalWidth += minWidth;
 
-            int minHeadHeight = headerComp.getPreferredSize().height;
-            minHeight = Math.max(minHeight, minHeadHeight);
-
         }
+        Instant end = Instant.now();
+
+        System.out.println("Applyzoom Execution time: " + Duration.between(start, end).toMillis());
         datesTable.getTableHeader().setDefaultRenderer(new RotatedHeaderRenderer(datesTable));
 
-        // set datesTable cell sizes
+
+         start = Instant.now();
+
+        // set datesTable cell sizes --------------NEW
+        TableColumnModel datesColumnModel = datesTable.getColumnModel();
+        TableColumnModel timeOffColumnModel = timeOffTable.getColumnModel();
+        TableCellRenderer headerRenderer = datesTable.getTableHeader().getDefaultRenderer();
+        int cachedZoomWidth = zoomedDateCellWidth;
+        int minHeight = 0;
         for (int i = 0; i < datesTable.getColumnModel().getColumnCount(); i++) {
-            datesTable.getColumnModel().getColumn(i).setMinWidth(zoomedDateCellWidth);
-            datesTable.getColumnModel().getColumn(i).setMaxWidth(zoomedDateCellWidth);
-            datesTable.getColumnModel().getColumn(i).setPreferredWidth(zoomedDateCellWidth);
-            timeOffTable.getColumnModel().getColumn(i).setMinWidth(zoomedDateCellWidth);
-            timeOffTable.getColumnModel().getColumn(i).setMaxWidth(zoomedDateCellWidth);
-            timeOffTable.getColumnModel().getColumn(i).setPreferredWidth(zoomedDateCellWidth);
-            TableColumn column = datesTable.getColumnModel().getColumn(i);
-            TableCellRenderer headerRenderer = datesTable.getTableHeader().getDefaultRenderer();
-            Component headerComp = headerRenderer.getTableCellRendererComponent(datesTable, column.getHeaderValue(), false, false, -1, i);
-            minHeight = Math.max(minHeight, headerComp.getPreferredSize().width);
+            TableColumn datesCol = datesColumnModel.getColumn(i);
+            TableColumn timeOffCol = timeOffColumnModel.getColumn(i);
+
+            datesCol.setMinWidth(zoomedDateCellWidth);
+            datesCol.setMaxWidth(zoomedDateCellWidth);
+            datesCol.setPreferredWidth(zoomedDateCellWidth);
+
+            timeOffCol.setMinWidth(zoomedDateCellWidth);
+            timeOffCol.setMaxWidth(zoomedDateCellWidth);
+            timeOffCol.setPreferredWidth(zoomedDateCellWidth);
+
+            if(minHeight < cachedZoomWidth){
+                Component headerComp = headerRenderer.getTableCellRendererComponent(datesTable, datesCol.getHeaderValue(), false, false, -1, i);
+                minHeight = Math.max(minHeight, headerComp.getPreferredSize().width);
+            }
         }
+
+        // set datesTable cell sizes -----------------OLD
+//        for (int i = 0; i < datesTable.getColumnModel().getColumnCount(); i++) {
+//            datesTable.getColumnModel().getColumn(i).setMinWidth(zoomedDateCellWidth);
+//            datesTable.getColumnModel().getColumn(i).setMaxWidth(zoomedDateCellWidth);
+//            datesTable.getColumnModel().getColumn(i).setPreferredWidth(zoomedDateCellWidth);
+//            timeOffTable.getColumnModel().getColumn(i).setMinWidth(zoomedDateCellWidth);
+//            timeOffTable.getColumnModel().getColumn(i).setMaxWidth(zoomedDateCellWidth);
+//            timeOffTable.getColumnModel().getColumn(i).setPreferredWidth(zoomedDateCellWidth);
+//            TableColumn column = datesTable.getColumnModel().getColumn(i);
+//            TableCellRenderer headerRenderer = datesTable.getTableHeader().getDefaultRenderer();
+//            Component headerComp = headerRenderer.getTableCellRendererComponent(datesTable, column.getHeaderValue(), false, false, -1, i);
+//            minHeight = Math.max(minHeight, headerComp.getPreferredSize().width);
+//        } end = Instant.now();
+
+
+        System.out.println("datetablesizes Execution time: " + Duration.between(start, end).toMillis());
         // set both tables preferred sizes
         dataTable.getTableHeader().setPreferredSize(new Dimension(dataTable.getTableHeader().getPreferredSize().width, minHeight));
         datesTable.getTableHeader().setPreferredSize(new Dimension(datesTable.getTableHeader().getPreferredSize().width, minHeight));
 
-        int zoomedCellHeight = (int)(30 * ZoomManager.getZoom());
         dataTable.setRowHeight(rowHeight);
         datesTable.setRowHeight(rowHeight);
         timeOffTable.setRowHeight(zoomedDateCellWidth * 2);
@@ -641,12 +702,15 @@ public class MainWindow extends JFrame implements ActionListener {
         plusZoomButton.setFont(BUTTON_FONT);
         minusZoomButton.setFont(BUTTON_FONT);
 
+        Instant start = Instant.now();
         setTableFontsAndSizes();
+        Instant end = Instant.now();
+
+        System.out.println("SetTableFonts Execution time: " + Duration.between(start, end).toMillis());
+
         setTableFontsAndSizes();
         this.revalidate();
         this.repaint();
-        setTableFontsAndSizes();
-
 
         setDividerLocation();
         syncScrollPanes();
@@ -827,12 +891,6 @@ public class MainWindow extends JFrame implements ActionListener {
             datesTable.scrollRectToVisible(cellRect);
         }
     }
-
-
-
-
-
-
 
     public void setDividerLocation(){
         splitPane.setDividerLocation(totalWidth);
@@ -1099,8 +1157,14 @@ public class MainWindow extends JFrame implements ActionListener {
         }
 
         if(e.getSource() == plusZoomButton) {
+
             ZoomManager.increaseZoom();
+
+            Instant start = Instant.now();
             applyZoom();
+            Instant end = Instant.now();
+
+            System.out.println("Applyzoom Execution time: " + Duration.between(start, end).toMillis());
         }
         if(e.getSource() == minusZoomButton) {
             ZoomManager.decreaseZoom();
