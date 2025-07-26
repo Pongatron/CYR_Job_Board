@@ -15,11 +15,13 @@ import java.util.ArrayList;
 public class DateTableCustomCellRenderer extends DefaultTableCellRenderer {
 
     private HoverIndex hoverRow;
+    private DateRange dateRange;
     private static final Color HOVER_COLOR = new Color(18,18,18);
     private static final Color ROW1_COLOR = new Color(40,40,40);
     private static final Color ROW2_COLOR = new Color(64,64,64);
     private static final Color BUILD_COLOR = new Color(0,100,180);
     private static final Color FINISH_COLOR = new Color(200,170,0);
+    private static final Color EXTRA_COLOR = new Color(120, 50,120);
     private static final Color INSTALL_COLOR = new Color(200,40,40);
     private static Border cellBorder = new EmptyBorder((int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()));
 
@@ -49,7 +51,7 @@ public class DateTableCustomCellRenderer extends DefaultTableCellRenderer {
         com.setForeground(Color.white);
         if(dates != null) {
 
-            DateRange dateRange = dates.get(row);
+            dateRange = dates.get(row);
             DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E- dd- MMM");
             if (isSelected) {
                 com.setBackground(table.getSelectionBackground());
@@ -68,6 +70,13 @@ public class DateTableCustomCellRenderer extends DefaultTableCellRenderer {
                     String dateString = date.format(dateFormat);
                     if (dateString.equals(table.getColumnName(column))) {
                         com.setBackground(FINISH_COLOR);
+                        break;
+                    }
+                }
+                for (LocalDate date : dateRange.getExtraDays()) {
+                    String dateString = date.format(dateFormat);
+                    if (dateString.equals(table.getColumnName(column))) {
+                        com.setBackground(EXTRA_COLOR);
                         break;
                     }
                 }

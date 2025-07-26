@@ -9,12 +9,15 @@ import java.sql.*;
 public class DatabaseInteraction {
 
     private Connection connection;
-    public static final String URL = "jdbc:postgresql://192.168.0.23:5432/postgres";
+    public static String URL = null;
     public static final String USERNAME = "postgres";
     public static final String PASSWORD = "0000";
     private ResultSet rs = null;
     private PreparedStatement ps = null;
 
+    public static void setUrl(String url){
+        URL = url;
+    }
 
     public void createConnection(){
         try {

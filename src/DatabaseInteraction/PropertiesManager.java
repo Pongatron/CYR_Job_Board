@@ -95,13 +95,11 @@ public class PropertiesManager {
     }
 
     public static void loadColumnDropdowns() throws IOException, SQLException {
-        Properties cellDropProps = new Properties();
-        FileInputStream cellDropInput = new FileInputStream(CELL_DROPDOWN_PROPERTIES_FILE_PATH);
-        cellDropProps.load(cellDropInput);
+        System.out.println("LOAD COLUMN DROPDOWNS");
 
-        Properties menuDropProps = new Properties();
-        FileInputStream menuDropInput = new FileInputStream(MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH);
-        menuDropProps.load(menuDropInput);
+        File f = new File(DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+        if(!f.exists())
+            f.createNewFile();
 
         Properties dropdownOptionProps = new Properties();
         FileInputStream dropdownOptionInput = new FileInputStream(DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
