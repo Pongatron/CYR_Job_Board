@@ -9,7 +9,7 @@ import java.sql.*;
 public class DatabaseInteraction {
 
     private Connection connection;
-    public static final String URL = "jdbc:postgresql://localhost:5432/postgres";
+    public static final String URL = "jdbc:postgresql://192.168.0.23:5432/postgres";
     public static final String USERNAME = "postgres";
     public static final String PASSWORD = "0000";
     private ResultSet rs = null;

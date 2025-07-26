@@ -17,7 +17,9 @@ import java.awt.event.*;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.sql.*;
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -80,7 +82,6 @@ public class MainWindow extends JFrame implements ActionListener {
     private JSplitPane splitPane;
     public static int totalWidth;
     private int todayCol = -1;
-    private boolean isArchiveHidden = false;
 
     ArrayList<Integer> visibleIndexes = new ArrayList<>();
 
@@ -97,7 +98,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
 
         Thread databaseListenerThread = new Thread(()->{
-            try (Connection conn = DriverManager.getConnection("jdbc:postgresql://localhost:5432/postgres", "postgres", "0000")) {
+            try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
 
                 PGConnection pgconn = conn.unwrap(org.postgresql.PGConnection.class);
                 Statement stmt = conn.createStatement();
@@ -363,8 +364,8 @@ public class MainWindow extends JFrame implements ActionListener {
         createDatesTable();
         populateDatesTable();
         populateTimeOffTable();
-        setTableFontsAndSizes();
-        setDividerLocation();
+        //setTableFontsAndSizes();
+        //setDividerLocation();
         applyZoom();
     }
 
@@ -403,34 +404,41 @@ public class MainWindow extends JFrame implements ActionListener {
 
         visibleIndexes = new ArrayList<>();
 
-        for (int i = 1; i <= colCount; i++) {
-            String columnName = rsMeta.getColumnLabel(i);
-            if("t".equals(PropertiesManager.getKeyValue(columnName, PropertiesManager.VISIBILITY_PROPERTIES_FILE_PATH))) {
-                visibleIndexes.add(i);
-                dataTableModel.addColumn(columnName.replace("_", " "));
-            }
-        }
+        Properties visibleProps = new Properties();
+        try (FileInputStream visibleInput = new FileInputStream(PropertiesManager.VISIBILITY_PROPERTIES_FILE_PATH)) {
+            visibleProps.load(visibleInput);
 
-        while (jobBoardResultSet.next()) {
-            Object[] row = new Object[visibleIndexes.size()];
-            Object[] emptyRow = new Object[visibleIndexes.size()];
-
-            for (int i = 0; i < visibleIndexes.size(); i++) {
-                int databaseIndex = visibleIndexes.get(i);
-                Object item = jobBoardResultSet.getObject(databaseIndex);
-                if (item instanceof Date) {
-                    LocalDate cellDate = ((Date) item).toLocalDate();
-                    row[i] = cellDate;
-                }
-                else{
-                    row[i] = item;
+            for (int i = 1; i <= colCount; i++) {
+                String columnName = rsMeta.getColumnLabel(i);
+                System.out.println(columnName);
+                if ("t".equals(visibleProps.getProperty(columnName))) {
+                    visibleIndexes.add(i);
+                    dataTableModel.addColumn(columnName.replace("_", " "));
                 }
             }
-            dataTableModel.addRow(row);
-            datesTableModel.addRow(emptyRow);
+
+            while (jobBoardResultSet.next()) {
+                Object[] row = new Object[visibleIndexes.size()];
+                Object[] emptyRow = new Object[visibleIndexes.size()];
+
+                for (int i = 0; i < visibleIndexes.size(); i++) {
+                    int databaseIndex = visibleIndexes.get(i);
+                    Object item = jobBoardResultSet.getObject(databaseIndex);
+                    if (item instanceof Date) {
+                        LocalDate cellDate = ((Date) item).toLocalDate();
+                        row[i] = cellDate;
+                    } else {
+                        row[i] = item;
+                    }
+                }
+                dataTableModel.addRow(row);
+                datesTableModel.addRow(emptyRow);
+            }
+            jobBoardResultSet.beforeFirst();
+            dataTable.setModel(dataTableModel);
+        }catch (IOException ex){
+            ex.printStackTrace();
         }
-        jobBoardResultSet.beforeFirst();
-        dataTable.setModel(dataTableModel);
         //-------------------
     }
 
@@ -871,6 +879,7 @@ public class MainWindow extends JFrame implements ActionListener {
                 final int[] currentCol = {0};
                 final String[] currentValue = {""};
                 editor = new DefaultCellEditor(editorField){
+
                     @Override
                     public boolean isCellEditable(EventObject anEvent) {
                         return super.isCellEditable(anEvent);
@@ -881,6 +890,7 @@ public class MainWindow extends JFrame implements ActionListener {
                         currentRow[0] = row;
                         currentCol[0] = column;
                         currentValue[0] = value != null ? value.toString() : "";
+                        System.out.println(currentValue[0]);
 
                         SwingUtilities.invokeLater(()->{
                             editorField.setCaretPosition(editorField.getText().length());
@@ -890,7 +900,11 @@ public class MainWindow extends JFrame implements ActionListener {
                     }
                     @Override
                     public boolean stopCellEditing() {
-                        if (enterPressed[0]) {
+                        String newValue = editorField.getText();
+                        System.out.println(newValue);
+
+                        if(!currentValue[0].equals(newValue)){
+                            System.out.println("DIFFERENT");
                             UpdateQueryBuilder qb = new UpdateQueryBuilder();
                             qb.updateTable("job_board");
                             try {
@@ -902,22 +916,13 @@ public class MainWindow extends JFrame implements ActionListener {
                                 qb.where("jwo = "+ dataTable.getValueAt(currentRow[0], columnIndex));
                                 database.sendUpdate(qb.build());
                             } catch (SQLException e) {
-                                enterPressed[0] = false;
                                 throw new RuntimeException(e);
                             }
-                            enterPressed[0] = false;
-                            try {
-                                loadTable();
-                            } catch (SQLException e) {
-                                enterPressed[0] = false;
-                                throw new RuntimeException(e);
-                            }
-                            setDividerLocation();
-                            return super.stopCellEditing();
-                        } else {
-                            cancelCellEditing(); // Explicitly cancel if Enter wasn't pressed
-                            return false; // Indicate that editing was not successfully stopped (committed)
                         }
+                        else{
+                            super.cancelCellEditing();
+                        }
+                        return false;
                     }
 
                     @Override
@@ -926,13 +931,6 @@ public class MainWindow extends JFrame implements ActionListener {
                     }
                 };
                 editor.setClickCountToStart(1);
-                DefaultCellEditor finalEditor = editor;
-                editorField.addActionListener(e -> {
-                    enterPressed[0] = true;
-                    finalEditor.stopCellEditing();
-                });
-                // Assign the editor to the column
-                text = editorField;
             }
             else if("t".equals(isDropdownValue)){
                 System.out.println("dropdown");
@@ -957,7 +955,7 @@ public class MainWindow extends JFrame implements ActionListener {
                 }
 
                 comboBox.setPreferredSize(new Dimension(200, 30));
-                comboBox.setEditable(true);
+                comboBox.setEditable(false);
                 comboBox.setBackground(new Color(60, 60, 60));
                 comboBox.setForeground(Color.WHITE);
                 comboBox.setFont(PLAIN_FONT);
@@ -1034,7 +1032,7 @@ public class MainWindow extends JFrame implements ActionListener {
                         Object currentSelection = comboBox.getSelectedItem();
                         if (currentSelection != null && !currentSelection.equals(previousSelection)) {
                             enterPressed[0] = true;
-                            finalEditor.stopCellEditing();
+                            SwingUtilities.invokeLater(()->finalEditor.stopCellEditing());
                         }
                     }
 

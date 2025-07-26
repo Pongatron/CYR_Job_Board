@@ -37,34 +37,6 @@ public class PropertiesManager {
         }
     }
 
-    public static ArrayList<Boolean> ReadColumnVisibility(ArrayList<String> columnNames){
-        Properties props = new Properties();
-        ArrayList<Boolean> columnVisible = new ArrayList<>();
-        try{
-            InputStream input = PropertiesManager.class.getClassLoader().getResourceAsStream(VISIBILITY_PROPERTIES_FILE_PATH);
-            props.load(input);
-
-            for(String s : columnNames){
-                System.out.println(s);
-                String isVisible = props.getProperty(s);
-                System.out.println(isVisible);
-                if(isVisible == null)
-                    isVisible = "true";
-                if(isVisible.equals("false")){
-                    columnVisible.add(false);
-                }
-                else{
-                    columnVisible.add(true);
-                }
-            }
-
-
-        } catch (Exception e){
-            e.printStackTrace();
-        }
-        return columnVisible;
-    }
-
     public static void queryPermissions(){
         DatabaseInteraction database = new DatabaseInteraction();
         SelectQueryBuilder qb = new SelectQueryBuilder();
@@ -135,7 +107,6 @@ public class PropertiesManager {
         FileInputStream dropdownOptionInput = new FileInputStream(DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
         dropdownOptionProps.load(dropdownOptionInput);
 
-        String[] colOrder = getColumnOrder();
 
         DatabaseInteraction database = new DatabaseInteraction();
         ResultSet rsTables = database.sendSelect("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'");
@@ -171,7 +142,7 @@ public class PropertiesManager {
         if(!f.exists()) {
             System.out.println("doesnt exist");
             f.createNewFile();
-            String columnOrderString = "jwo,customer,po_date,cust_po,job_name,del,due_date,shops_submit,shops_app,finish_sample_submit,finish_sample_app,in_shop,mechanic,sub,finishing,build,finish,install,is_active";
+            String columnOrderString = "jwo,customer,po_date,cust_po,job_name,del,due_date,shops_submit,shops_app,finish_sample_submit,finish_sample_app,in_shop,mechanic,sub,finishing,notes,build,finish,extra,install,is_active\n";
 
             Properties userPrefProps = new Properties();
             userPrefProps.setProperty("column.order", columnOrderString);
