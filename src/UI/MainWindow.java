@@ -19,12 +19,8 @@ import java.beans.PropertyChangeListener;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URL;
 import java.sql.*;
 import java.time.DayOfWeek;
-import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -69,7 +65,7 @@ public class MainWindow extends JFrame implements ActionListener {
     private JButton customerFilterButton;
     private JButton dateFilterButton;
     private JButton todayButton;
-    private JButton resetViewButton;
+    private JButton resetBoardButton;
     private JButton timeOffButton;
     private JButton archiveButton;
     private JButton plusZoomButton;
@@ -105,13 +101,13 @@ public class MainWindow extends JFrame implements ActionListener {
                 Statement stmt = conn.createStatement();
                 stmt.execute("LISTEN table_update");
 
-                System.out.println("Waiting for notification...");
+                //System.out.println("Waiting for notification...");
 
                 while(true){
                     PGNotification[] notifications = pgconn.getNotifications();
                     if(notifications != null){
                         for(PGNotification notification : notifications){
-                            System.out.println("Recieved: "+ notification.getParameter());
+                            //System.out.println("Recieved: "+ notification.getParameter());
                             SwingUtilities.invokeLater(()->{
                                 refreshData("due_date");
                             });
@@ -139,7 +135,7 @@ public class MainWindow extends JFrame implements ActionListener {
         buttonPanel.add(dateFilterButton);
 
         topContainerPanel.add(buttonPanel);
-        topContainerPanel.add(resetViewButton);
+        topContainerPanel.add(resetBoardButton);
         topContainerPanel.add(archiveButton);
         topContainerPanel.add(timeOffButton);
         topContainerPanel.add(todayButton);
@@ -277,12 +273,12 @@ public class MainWindow extends JFrame implements ActionListener {
         todayButton.setFocusable(false);
         todayButton.addActionListener(this);
 
-        resetViewButton = new JButton("Reset View");
-        resetViewButton.setBackground(new Color(0, 0, 0));
-        resetViewButton.setForeground(new Color(255,255,255));
-        resetViewButton.setFont(BUTTON_FONT);
-        resetViewButton.setFocusable(false);
-        resetViewButton.addActionListener(this);
+        resetBoardButton = new JButton("Reset Board");
+        resetBoardButton.setBackground(new Color(0, 0, 0));
+        resetBoardButton.setForeground(new Color(255,255,255));
+        resetBoardButton.setFont(BUTTON_FONT);
+        resetBoardButton.setFocusable(false);
+        resetBoardButton.addActionListener(this);
 
         archiveButton = new JButton("Archive");
         archiveButton.setBackground(new Color(0, 0, 0));
@@ -389,6 +385,7 @@ public class MainWindow extends JFrame implements ActionListener {
         qbJobBoard.from("job_board");
         qbJobBoard.where("is_active = "+isActiveValue);
         qbJobBoard.orderBy(new Filter(filter, ASC));
+        qbJobBoard.orderBy(new Filter("jwo", ASC));
         jobBoardResultSet = database.sendSelect(qbJobBoard.build());
 
         SelectQueryBuilder qbCustomerList = new SelectQueryBuilder();
@@ -410,7 +407,6 @@ public class MainWindow extends JFrame implements ActionListener {
 
             for (int i = 1; i <= colCount; i++) {
                 String columnName = rsMeta.getColumnLabel(i);
-                System.out.println(columnName);
                 if ("t".equals(visibleProps.getProperty(columnName))) {
                     visibleIndexes.add(i);
                     dataTableModel.addColumn(columnName.replace("_", " "));
@@ -461,6 +457,9 @@ public class MainWindow extends JFrame implements ActionListener {
                     saturdayList.add(date);
                 }
             }
+        }
+        if(today.getDayOfWeek() == DayOfWeek.SATURDAY && !saturdayList.contains(today)){
+            saturdayList.add(today);
         }
         jobBoardResultSet.beforeFirst();
 
@@ -520,9 +519,6 @@ public class MainWindow extends JFrame implements ActionListener {
             throw new RuntimeException(e);
         }
 
-
-        Instant start = Instant.now();
-
         // calculate each column width and set it as the preferred size so nothing looks cut off
         totalWidth = 0;
         int rowHeight = zoomedDateCellWidth;
@@ -537,13 +533,6 @@ public class MainWindow extends JFrame implements ActionListener {
                 TableCellRenderer cellRenderer = dataTable.getCellRenderer(row, col);
                 Component comp = dataTable.prepareRenderer(cellRenderer, row, col);
 
-                FontMetrics fm = comp.getFontMetrics(PLAIN_FONT);
-                String cellText = dataTable.getValueAt(row, col) != null ? dataTable.getValueAt(row, col).toString() : "";
-
-                Border border = ((JComponent)comp).getBorder();
-                Insets borderInsets = border.getBorderInsets(comp);
-
-                int textWidth = fm.stringWidth(cellText) + borderInsets.left + borderInsets.right + zoomedCellBuffer;
                 int cellWidth = comp.getPreferredSize().width;
                 if(headerComp.getText().contains("date"))
                     cellWidth = comp.getPreferredSize().width;
@@ -563,14 +552,12 @@ public class MainWindow extends JFrame implements ActionListener {
 
             String columnName = column.getHeaderValue().toString().replace(" ", "_");
             FontMetrics fm  = dataTable.getFontMetrics(PLAIN_FONT);
-            System.out.println(columnName);
             if("t".equals(isDropdownProps.getProperty(columnName))){
                 if(columnName.equals("mechanic"))
                     columnName = "worker";
                 String[] dropdownOptions = dropdownOptionsProps.getProperty(columnName+"_list.dropdown.options").split(",");
                 for(String s : dropdownOptions){
                     int textWidth = fm.stringWidth(s) + (int)(5*currentZoom);
-                    System.out.println("text width = "+textWidth);
                     minWidth = Math.max(minWidth, textWidth);
                 }
             }
@@ -582,13 +569,7 @@ public class MainWindow extends JFrame implements ActionListener {
             totalWidth += minWidth;
 
         }
-        Instant end = Instant.now();
-
-        System.out.println("Applyzoom Execution time: " + Duration.between(start, end).toMillis());
         datesTable.getTableHeader().setDefaultRenderer(new RotatedHeaderRenderer(datesTable));
-
-
-         start = Instant.now();
 
         // set datesTable cell sizes
         TableColumnModel datesColumnModel = datesTable.getColumnModel();
@@ -614,7 +595,6 @@ public class MainWindow extends JFrame implements ActionListener {
             }
         }
 
-        System.out.println("datetablesizes Execution time: " + Duration.between(start, end).toMillis());
         // set both tables preferred sizes
         dataTable.getTableHeader().setPreferredSize(new Dimension(dataTable.getTableHeader().getPreferredSize().width, minHeight));
         datesTable.getTableHeader().setPreferredSize(new Dimension(datesTable.getTableHeader().getPreferredSize().width, minHeight));
@@ -649,18 +629,13 @@ public class MainWindow extends JFrame implements ActionListener {
         customerFilterButton.setFont(BUTTON_FONT);
         dateFilterButton.setFont(BUTTON_FONT);
         todayButton.setFont(BUTTON_FONT);
-        resetViewButton.setFont(BUTTON_FONT);
+        resetBoardButton.setFont(BUTTON_FONT);
         archiveButton.setFont(BUTTON_FONT);
         timeOffButton.setFont(BUTTON_FONT);
         plusZoomButton.setFont(BUTTON_FONT);
         minusZoomButton.setFont(BUTTON_FONT);
 
-        Instant start = Instant.now();
         setTableFontsAndSizes();
-        Instant end = Instant.now();
-
-        System.out.println("SetTableFonts Execution time: " + Duration.between(start, end).toMillis());
-
         setTableFontsAndSizes();
         try {
             setEditableAndDropdownColumns(visibleIndexes);
@@ -698,6 +673,8 @@ public class MainWindow extends JFrame implements ActionListener {
             int finishDays = (int) jobBoardResultSet.getInt(finishIndex);
             int extraDays = (int) jobBoardResultSet.getInt(extraIndex);
             int installDays = (int) jobBoardResultSet.getInt(installIndex);
+            if(jobBoardResultSet.wasNull())
+                installDays = 1;
             int daysBack = buildDays + finishDays + extraDays;
             int daysForward = installDays - 1;
 
@@ -768,7 +745,6 @@ public class MainWindow extends JFrame implements ActionListener {
                 }
             }
             tempDatePopulator = extraStart;
-            System.out.println(extraStart);
             for (int j = 0; j < (extraDays); ) {
                 tempDatePopulator = tempDatePopulator.plusDays(1);
                 if (!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
@@ -893,6 +869,17 @@ public class MainWindow extends JFrame implements ActionListener {
         DefaultCellEditor oldEditor = (DefaultCellEditor) dataTable.getColumnModel().getColumn(0).getCellEditor();
         DefaultCellEditor editor = null;
 
+        if(currentBoardMode == JobBoardMode.ARCHIVE){
+            dataTable.setDefaultEditor(Object.class, null);
+            dataTable.setRowSelectionAllowed(false);
+            dataTable.setColumnSelectionAllowed(false);
+            dataTable.setCellSelectionEnabled(false);
+            return;
+        }
+        else{
+            dataTable.setRowSelectionAllowed(true);
+        }
+
         jobBoardResultSet.beforeFirst();
         for(int i = 0; i < dataTableModel.getColumnCount(); i++){
             String columnLabel = jobBoardResultSet.getMetaData().getColumnLabel(visibleIndexes.get(i));
@@ -900,9 +887,7 @@ public class MainWindow extends JFrame implements ActionListener {
             String isDropdownValue = dropdownProps.getProperty(columnLabel);
             JComponent text = new JComponent(){};
             if("t".equals(isDropdownValue)){
-                System.out.println("dropdown");
                 String columnName = columnLabel;
-                System.out.println(columnName+": "+isDropdownValue);
                 if(columnLabel.equals("mechanic"))
                     columnName = "worker";
                 String dropdownList = dropdownListProps.getProperty(columnName + "_list.dropdown.options") != null ? dropdownListProps.getProperty(columnName + "_list.dropdown.options") : ",none";
@@ -957,12 +942,9 @@ public class MainWindow extends JFrame implements ActionListener {
                     }
                     @Override
                     public boolean stopCellEditing() {
-                        System.out.println("old value: "+currentValue[0]);
                         String newValue = comboBox.getSelectedItem() != null ? comboBox.getSelectedItem().toString() : "";
-                        System.out.println("new value: "+newValue);
 
                         if (!currentValue[0].equals(newValue)) {
-                            System.out.println("DIFFERENT DROPDOWN");
                             UpdateQueryBuilder qb = new UpdateQueryBuilder();
                             qb.updateTable("job_board");
                             try {
@@ -976,11 +958,13 @@ public class MainWindow extends JFrame implements ActionListener {
                             } catch (SQLException e) {
                                 throw new RuntimeException(e);
                             }
+                            return super.stopCellEditing();
                         }
                         else{
-                            super.cancelCellEditing();
+                            cancelCellEditing();
+                            return super.stopCellEditing();
                         }
-                        return true;
+
                     }
                 };
                 editor.setClickCountToStart(1);
@@ -1007,7 +991,6 @@ public class MainWindow extends JFrame implements ActionListener {
                 text = comboBox;
             }
             else if("t".equals(isEditableValue)){
-                System.out.println("editable");
                 JTextField editorField = new JTextField();
                 editorField.setBackground(new Color(24, 24, 24));
                 editorField.setForeground(new Color(255,255,255));
@@ -1032,7 +1015,6 @@ public class MainWindow extends JFrame implements ActionListener {
                         currentRow[0] = row;
                         currentCol[0] = column;
                         currentValue[0] = value != null ? value.toString() : "";
-                        System.out.println(currentValue[0]);
 
                         SwingUtilities.invokeLater(()->{
                             editorField.setCaretPosition(editorField.getText().length());
@@ -1043,10 +1025,8 @@ public class MainWindow extends JFrame implements ActionListener {
                     @Override
                     public boolean stopCellEditing() {
                         String newValue = editorField.getText() != null ? editorField.getText() : "";
-                        System.out.println(newValue);
 
                         if(!currentValue[0].equals(newValue)){
-                            System.out.println("DIFFERENT EDITABLE");
                             UpdateQueryBuilder qb = new UpdateQueryBuilder();
                             qb.updateTable("job_board");
                             try {
@@ -1062,9 +1042,10 @@ public class MainWindow extends JFrame implements ActionListener {
                             }
                         }
                         else{
-                            super.cancelCellEditing();
+                            cancelCellEditing();
+                            return super.stopCellEditing();
                         }
-                        return true;
+                        return super.stopCellEditing();
                     }
 
                     @Override
@@ -1075,7 +1056,6 @@ public class MainWindow extends JFrame implements ActionListener {
                 editor.setClickCountToStart(1);
             }
             else{
-                System.out.println("neither");
                 editor = oldEditor;
             }
 
@@ -1091,14 +1071,14 @@ public class MainWindow extends JFrame implements ActionListener {
         }
         if(e.getSource() == updateJobButton){
             int selectedRow = dataTable.getSelectedRow();
-            if(selectedRow != -1) {
+            if(selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
                 String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
                 new UpdateJobWindow(database, jobBoardResultSet, selectedJwo);
             }
         }
         if(e.getSource() == deleteButton){
             int selectedRow = dataTable.getSelectedRow();
-            if(selectedRow != -1) {
+            if(selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
                 String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
                 new DeleteJobWindow(selectedJwo);
             }
@@ -1115,7 +1095,7 @@ public class MainWindow extends JFrame implements ActionListener {
         if(e.getSource() == todayButton) {
             resetDatesScrollBar();
         }
-        if(e.getSource() == resetViewButton) {
+        if(e.getSource() == resetBoardButton) {
             currentBoardMode = JobBoardMode.ACTIVE_JOBS;
             refreshData("due_date");
         }
@@ -1129,14 +1109,8 @@ public class MainWindow extends JFrame implements ActionListener {
         }
 
         if(e.getSource() == plusZoomButton) {
-
             ZoomManager.increaseZoom();
-
-            Instant start = Instant.now();
             applyZoom();
-            Instant end = Instant.now();
-
-            System.out.println("Applyzoom Execution time: " + Duration.between(start, end).toMillis());
         }
         if(e.getSource() == minusZoomButton) {
             ZoomManager.decreaseZoom();

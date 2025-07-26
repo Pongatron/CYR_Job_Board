@@ -34,7 +34,6 @@ public class Main {
             int result = JOptionPane.showConfirmDialog(null, panel, "User Input", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
             String url = "";
             if(result == JOptionPane.OK_OPTION){
-                System.out.println(textField.getText());
                 url = "jdbc:postgresql://" + textField.getText() + ":5432/postgres";
                 try{
                     DatabaseInteraction.setUrl(url);

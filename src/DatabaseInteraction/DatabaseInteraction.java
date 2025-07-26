@@ -22,7 +22,7 @@ public class DatabaseInteraction {
     public void createConnection(){
         try {
             connection = DriverManager.getConnection(URL, USERNAME, PASSWORD);
-            System.out.println("Connection.isValid(0) = " + connection.isValid(0));
+            //System.out.println("Connection.isValid(0) = " + connection.isValid(0));
         } catch (SQLException ex){
             ex.printStackTrace();
             closeConnection();
@@ -34,12 +34,12 @@ public class DatabaseInteraction {
         }catch (SQLException ex) {
             ex.printStackTrace();
         }
-        System.out.println("Connection Closed");
+        //System.out.println("Connection Closed");
     }
     public void closeResources() {
         try { rs.close(); } catch (Exception ex) { /* Ignored */ }
         try { ps.close(); } catch (Exception ex) { /* Ignored */ }
-        System.out.println("Resources Closed");
+        //System.out.println("Resources Closed");
         closeConnection();
     }
     public ResultSet sendSelect(String query) {
@@ -51,7 +51,7 @@ public class DatabaseInteraction {
             closeResources();
             e.printStackTrace();
         }finally {
-            System.out.println("QueryInteracter(select): "+query);
+            //System.out.println("QueryInteracter(select): "+query);
         }
         return rs;
     }
@@ -68,6 +68,6 @@ public class DatabaseInteraction {
             try { ps.close(); } catch (Exception ex) {/*Ignored*/}
         }
 
-        System.out.println("QueryInteracter(update): "+query);
+        //System.out.println("QueryInteracter(update): "+query);
     }
 }

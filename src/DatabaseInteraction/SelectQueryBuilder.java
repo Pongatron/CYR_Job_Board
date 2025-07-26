@@ -77,7 +77,7 @@ public class SelectQueryBuilder {
 
 
         sb.append(";");
-        System.out.println("SelectQueryBuilder: "+sb.toString());
+        //System.out.println("SelectQueryBuilder: "+sb.toString());
         return sb.toString();
     }
 

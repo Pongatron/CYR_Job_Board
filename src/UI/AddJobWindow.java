@@ -217,7 +217,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
                 if(isRequired){
                     if(str.isBlank()) {
                         notEmpty = false;
-                        System.out.println("Empty required field: "+labelText);
+                        //System.out.println("Empty required field: "+labelText);
                         missingFields += labelText + ", ";
                     }
                     else {
@@ -232,7 +232,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
             }
             try {
                 if(notEmpty) {
-                    System.out.println("all required fields filled");
+                    //System.out.println("all required fields filled");
                     database.sendUpdate(qb.build());
                     dispose();
                 }
@@ -244,7 +244,6 @@ public class AddJobWindow extends JFrame implements ActionListener {
                 if(userMessage.toLowerCase().contains("duplicate") && userMessage.toLowerCase().contains("key")){
                     userMessage = "A job with this JWO already exists.";
                 }
-                System.out.println(userMessage);
                 JOptionPane.showMessageDialog(this, userMessage, null, JOptionPane.ERROR_MESSAGE);
             }finally {
                 database.closeResources();

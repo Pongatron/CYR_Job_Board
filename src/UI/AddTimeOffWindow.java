@@ -196,7 +196,7 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
                 if(isRequired){
                     if(str.isBlank()) {
                         notEmpty = false;
-                        System.out.println("Empty required field: "+labelText);
+                        //System.out.println("Empty required field: "+labelText);
                         missingFields += labelText + ", ";
                     }
                     else {
@@ -211,7 +211,7 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
             }
             try {
                 if(notEmpty) {
-                    System.out.println("all required fields filled");
+                    //System.out.println("all required fields filled");
                     database.sendUpdate(qb.build());
                     dispose();
                 }
@@ -229,7 +229,6 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
                 else if(userMessage.toLowerCase().contains("end_date") && userMessage.toLowerCase().contains("null")){
                     userMessage = "You must enter an end date";
                 }
-                System.out.println(userMessage);
                 JOptionPane.showMessageDialog(this, userMessage, null, JOptionPane.ERROR_MESSAGE);
             }finally {
                 database.closeResources();

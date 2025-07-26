@@ -88,14 +88,14 @@ public class PropertiesManager {
             if(propertiesChanged){
                 OutputStream output = new FileOutputStream(config.filePath);
                 props.store(output, config.comment);
-                System.out.println("Updated: "+config.filePath);
+                //System.out.println("Updated: "+config.filePath);
                 output.close();
             }
         }
     }
 
     public static void loadColumnDropdowns() throws IOException, SQLException {
-        System.out.println("LOAD COLUMN DROPDOWNS");
+        //System.out.println("LOAD COLUMN DROPDOWNS");
 
         File f = new File(DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
         if(!f.exists())
@@ -112,7 +112,6 @@ public class PropertiesManager {
         while(rsTables.next()){
             String tableName = rsTables.getString(1);
             if(tableName.contains("list")){
-                System.out.println(tableName);
                 dropdownTablesList.add(tableName);
             }
         }
@@ -138,7 +137,6 @@ public class PropertiesManager {
 
         File f = new File(USER_PREF_PROPERTIES_FILE_PATH);
         if(!f.exists()) {
-            System.out.println("doesnt exist");
             f.createNewFile();
             String columnOrderString = "jwo,customer,po_date,cust_po,job_name,del,due_date,shops_submit,shops_app,finish_sample_submit,finish_sample_app,in_shop,mechanic,sub,finishing,notes,build,finish,extra,install,is_active\n";
 

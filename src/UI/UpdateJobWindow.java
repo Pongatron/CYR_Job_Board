@@ -13,6 +13,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -33,6 +35,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
     private String selectedJwo;
     ArrayList<String> requiredCols;
     private static final Color UPDATE_PANEL_COLOR = new Color(40, 40, 40);
+    private DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("MM/dd/yy");
 
     public UpdateJobWindow(DatabaseInteraction db, ResultSet rs, String jwo){
         database = db;
@@ -203,6 +206,12 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                 int databaseColIndex = jobBoardResultSet.findColumn(columnName.replace("*", ""));
                 Object value = jobBoardResultSet.getObject(databaseColIndex);
 
+                if(value instanceof java.sql.Date){
+                    java.sql.Date sqlDate = (java.sql.Date) value;
+                    LocalDate localDate = sqlDate.toLocalDate();
+                    value = dateFormat.format(localDate);
+                }
+
                 if(text instanceof JComboBox<?> comboBox){
                     comboBox.setSelectedItem(value != null ? value.toString() : "");
                 }
@@ -239,7 +248,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                 if(isRequired){
                     if(str.isBlank()) {
                         notEmpty = false;
-                        System.out.println("Empty required field: "+labelText);
+                        //System.out.println("Empty required field: "+labelText);
                         missingFields += labelText + ", ";
                     }
                     else {
@@ -254,7 +263,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
             }
             try {
                 if(notEmpty) {
-                    System.out.println("all required fields filled");
+                    //System.out.println("all required fields filled");
                     qb.where("jwo=" + selectedJwo);
                     database.sendUpdate(qb.build());
                     dispose();
@@ -264,11 +273,9 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
             } catch (Exception ex) {
                 ex.printStackTrace();
                 String userMessage = ex.getMessage();
-                System.out.println(userMessage);
                 if(userMessage.toLowerCase().contains("duplicate") && userMessage.toLowerCase().contains("key")){
                     userMessage = "A job with this JWO already exists.";
                 }
-                System.out.println(userMessage);
                 JOptionPane.showMessageDialog(this, userMessage, null, JOptionPane.ERROR_MESSAGE);
             }finally {
                 database.closeResources();

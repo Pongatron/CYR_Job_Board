@@ -57,7 +57,7 @@ public class InsertQueryBuilder {
         }
         sb.append(");");
 
-        System.out.println("InsertQueryBuilder: "+sb.toString());
+        //System.out.println("InsertQueryBuilder: "+sb.toString());
         return sb.toString();
     }
 

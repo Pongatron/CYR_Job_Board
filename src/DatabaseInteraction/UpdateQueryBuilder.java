@@ -66,7 +66,7 @@ public class UpdateQueryBuilder {
         }
         sb.append(";");
 
-        System.out.println("UpdateQueryBuilder: "+sb.toString());
+        //System.out.println("UpdateQueryBuilder: "+sb.toString());
         return sb.toString();
     }
 }
