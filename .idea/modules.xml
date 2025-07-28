@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/Database Interaction Experiment.iml" filepath="$PROJECT_DIR$/Database Interaction Experiment.iml" />
+      <module fileurl="file://$PROJECT_DIR$/DatabaseInteractionExperiment.iml" filepath="$PROJECT_DIR$/DatabaseInteractionExperiment.iml" />
     </modules>
   </component>
 </project>

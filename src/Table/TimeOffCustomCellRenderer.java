@@ -50,9 +50,6 @@ public class TimeOffCustomCellRenderer extends DefaultTableCellRenderer {
         }
         label.setForeground(Color.white);
 
-        //label.setText("OP");
-        //System.out.println(dates.get(1));
-
         if(dates != null) {
             String allPeople = "";
             for(int i = 0; i < dates.size(); i++) {
@@ -69,7 +66,6 @@ public class TimeOffCustomCellRenderer extends DefaultTableCellRenderer {
 
                             label.setText(wrappedText);
                             label.setBackground(new Color(24, 80, 24));
-                            //System.out.println(dateString + " " + dateRange.getPerson());
                         }
                     }
                 }

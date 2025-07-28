@@ -4,6 +4,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.PGNotification;
 import org.postgresql.xa.PGXADataSource;
 
+import javax.swing.*;
 import java.sql.*;
 
 public class DatabaseInteraction {
@@ -22,9 +23,8 @@ public class DatabaseInteraction {
     public void createConnection(){
         try {
             connection = DriverManager.getConnection(URL, USERNAME, PASSWORD);
-            //System.out.println("Connection.isValid(0) = " + connection.isValid(0));
         } catch (SQLException ex){
-            ex.printStackTrace();
+            JOptionPane.showMessageDialog(null, ex.getMessage());
             closeConnection();
         }
     }
@@ -32,14 +32,12 @@ public class DatabaseInteraction {
         try {
             connection.close();
         }catch (SQLException ex) {
-            ex.printStackTrace();
+            JOptionPane.showMessageDialog(null, ex.getMessage());
         }
-        //System.out.println("Connection Closed");
     }
     public void closeResources() {
         try { rs.close(); } catch (Exception ex) { /* Ignored */ }
         try { ps.close(); } catch (Exception ex) { /* Ignored */ }
-        //System.out.println("Resources Closed");
         closeConnection();
     }
     public ResultSet sendSelect(String query) {
@@ -47,11 +45,9 @@ public class DatabaseInteraction {
         try {
             ps = connection.prepareStatement(query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             rs = ps.executeQuery();
-        } catch (SQLException e) {
+        } catch (SQLException ex) {
             closeResources();
-            e.printStackTrace();
-        }finally {
-            //System.out.println("QueryInteracter(select): "+query);
+            JOptionPane.showMessageDialog(null, ex.getMessage());
         }
         return rs;
     }
@@ -60,14 +56,11 @@ public class DatabaseInteraction {
         try {
             ps = connection.prepareStatement(query);
             ps.executeUpdate();
-        } catch (SQLException e) {
+        } catch (SQLException ex) {
             closeResources();
-            e.printStackTrace();
-            throw e;
+            throw ex;
         }finally {
             try { ps.close(); } catch (Exception ex) {/*Ignored*/}
         }
-
-        //System.out.println("QueryInteracter(update): "+query);
     }
 }

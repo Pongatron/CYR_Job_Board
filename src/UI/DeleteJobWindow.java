@@ -170,7 +170,7 @@ public class DeleteJobWindow extends JFrame implements ActionListener {
                     database.sendUpdate(qb.build());
                     JOptionPane.showMessageDialog(this, "Job sent to Archive");
                 } catch (SQLException ex) {
-                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(null, ex.getMessage());
                 }
 
                 dispose();

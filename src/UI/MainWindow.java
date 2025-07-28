@@ -19,6 +19,7 @@ import java.beans.PropertyChangeListener;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.sql.*;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -79,13 +80,14 @@ public class MainWindow extends JFrame implements ActionListener {
     private JSplitPane splitPane;
     public static int totalWidth;
     private int todayCol = -1;
+    private JLabel zoomLabel;
 
     ArrayList<Integer> visibleIndexes = new ArrayList<>();
 
     DefaultTableModel dataTableModel;
     DefaultTableModel datesTableModel;
 
-    public MainWindow() throws Exception{
+    public MainWindow() {
         database = new DatabaseInteraction();
         refreshResultSets("due_date");
         initializeComponents();
@@ -101,13 +103,10 @@ public class MainWindow extends JFrame implements ActionListener {
                 Statement stmt = conn.createStatement();
                 stmt.execute("LISTEN table_update");
 
-                //System.out.println("Waiting for notification...");
-
                 while(true){
                     PGNotification[] notifications = pgconn.getNotifications();
                     if(notifications != null){
                         for(PGNotification notification : notifications){
-                            //System.out.println("Recieved: "+ notification.getParameter());
                             SwingUtilities.invokeLater(()->{
                                 refreshData("due_date");
                             });
@@ -140,6 +139,7 @@ public class MainWindow extends JFrame implements ActionListener {
         topContainerPanel.add(timeOffButton);
         topContainerPanel.add(todayButton);
         topContainerPanel.add(minusZoomButton);
+        topContainerPanel.add(zoomLabel);
         topContainerPanel.add(plusZoomButton);
 
         leftPanel.setPreferredSize(new Dimension(totalWidth, 100));
@@ -182,7 +182,6 @@ public class MainWindow extends JFrame implements ActionListener {
         dataTable.setFont(new Font(dataTable.getFont().getFontName(), Font.PLAIN, 30));
 
         datesTable = new JTable();
-        //datesTable.getTableHeader().addMouseListener(this);
         datesTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         datesTable.setDefaultEditor(Object.class, null);
         datesTable.getTableHeader().setReorderingAllowed(false);
@@ -193,7 +192,6 @@ public class MainWindow extends JFrame implements ActionListener {
         datesTable.setBackground(new Color(24,24,24));
 
         timeOffTable = new JTable();
-        //timeOffTable.getTableHeader().addMouseListener(this);
         timeOffTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         timeOffTable.setDefaultEditor(Object.class, null);
         timeOffTable.getTableHeader().setReorderingAllowed(false);
@@ -334,6 +332,12 @@ public class MainWindow extends JFrame implements ActionListener {
         splitPane.setDividerSize(5);
         splitPane.setBorder(null);
 
+        zoomLabel = new JLabel();
+        zoomLabel.setBackground(new Color(0, 0, 0));
+        zoomLabel.setForeground(new Color(255,255,255));
+        zoomLabel.setFont(BUTTON_FONT);
+        zoomLabel.setFocusable(false);
+
         TableCustom.apply(tableScroll, TableCustom.TableType.DEFAULT);
         TableCustom.apply(datesScroll, TableCustom.TableType.VERTICAL);
         TableCustom.apply(timeOffScroll, TableCustom.TableType.TIMEOFF);
@@ -355,7 +359,7 @@ public class MainWindow extends JFrame implements ActionListener {
         });
     }
 
-    public void loadTable()  throws SQLException{
+    public void loadTable() {
         dataTableModel = new DefaultTableModel();
         datesTableModel = new DefaultTableModel();
         createDataTable();
@@ -367,11 +371,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
     public void refreshData(String filter){
         refreshResultSets(filter);
-        try {
-            loadTable();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+        loadTable();
     }
 
     public void refreshResultSets(String filter){
@@ -394,16 +394,23 @@ public class MainWindow extends JFrame implements ActionListener {
         customerListResultSet = database.sendSelect(qbCustomerList.build());
     }
 
-    public void createDataTable() throws SQLException{
+    public void createDataTable(){
         //---------- create datatable
-        ResultSetMetaData rsMeta = jobBoardResultSet.getMetaData();
-        int colCount = rsMeta.getColumnCount();
-
         visibleIndexes = new ArrayList<>();
 
         Properties visibleProps = new Properties();
-        try (FileInputStream visibleInput = new FileInputStream(PropertiesManager.VISIBILITY_PROPERTIES_FILE_PATH)) {
+        FileInputStream visibleInput = null;
+        try {
+            visibleInput = new FileInputStream(PropertiesManager.VISIBILITY_PROPERTIES_FILE_PATH);
             visibleProps.load(visibleInput);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(null, e.getMessage());
+        }
+
+        try {
+            jobBoardResultSet.beforeFirst();
+            ResultSetMetaData rsMeta = jobBoardResultSet.getMetaData();
+            int colCount = rsMeta.getColumnCount();
 
             for (int i = 1; i <= colCount; i++) {
                 String columnName = rsMeta.getColumnLabel(i);
@@ -430,15 +437,14 @@ public class MainWindow extends JFrame implements ActionListener {
                 dataTableModel.addRow(row);
                 datesTableModel.addRow(emptyRow);
             }
-            jobBoardResultSet.beforeFirst();
             dataTable.setModel(dataTableModel);
-        }catch (IOException ex){
-            ex.printStackTrace();
+        }catch (SQLException e){
+            JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+            System.exit(1);
         }
-        //-------------------
     }
 
-    public void createDatesTable() throws SQLException {
+    public void createDatesTable() {
         //--------------------------- create dates table
         DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E- dd- MMM");
         LocalDate today = LocalDate.now();
@@ -449,19 +455,25 @@ public class MainWindow extends JFrame implements ActionListener {
 
         DefaultTableModel timeOffTableModel = new DefaultTableModel();
 
-        while(jobBoardResultSet.next()){
-            Date sqlDate = jobBoardResultSet.getDate("due_date");
-            LocalDate date = sqlDate.toLocalDate();
-            if(date.getDayOfWeek() == DayOfWeek.SATURDAY) {
-                if(!saturdayList.contains(date)) {
-                    saturdayList.add(date);
+        try {
+            jobBoardResultSet.beforeFirst();
+            while (jobBoardResultSet.next()) {
+                Date sqlDate = jobBoardResultSet.getDate("due_date");
+                LocalDate date = sqlDate.toLocalDate();
+                if (date.getDayOfWeek() == DayOfWeek.SATURDAY) {
+                    if (!saturdayList.contains(date)) {
+                        saturdayList.add(date);
+                    }
                 }
             }
+        }catch (SQLException e){
+            JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+            System.exit(1);
         }
+
         if(today.getDayOfWeek() == DayOfWeek.SATURDAY && !saturdayList.contains(today)){
             saturdayList.add(today);
         }
-        jobBoardResultSet.beforeFirst();
 
         while(!currentDate.isAfter(oneYearFromNow)){
             if(currentDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
@@ -513,10 +525,8 @@ public class MainWindow extends JFrame implements ActionListener {
             isDropdownProps.load(isDropdownInput);
             dropdownOptionsInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
             dropdownOptionsProps.load(dropdownOptionsInput);
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            JOptionPane.showMessageDialog(null, e.getMessage());
         }
 
         // calculate each column width and set it as the preferred size so nothing looks cut off
@@ -607,6 +617,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
     public void applyZoom(){
         currentZoom = ZoomManager.getZoom();
+        zoomLabel.setText(String.format("%.1fx", currentZoom));
 
         zoomedDateCellWidth = (int)(30 * currentZoom);
         zoomedCellBuffer = (int)(8 * currentZoom);
@@ -620,7 +631,6 @@ public class MainWindow extends JFrame implements ActionListener {
         datesTable.setFont(PLAIN_FONT);
         datesTable.getTableHeader().setFont(BOLD_FONT);
         timeOffTable.setFont(PLAIN_FONT);
-        //timeOffTable.getTableHeader().setFont(BOLD_FONT);
 
         addJobButton.setFont(BUTTON_FONT);
         updateJobButton.setFont(BUTTON_FONT);
@@ -637,13 +647,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
         setTableFontsAndSizes();
         setTableFontsAndSizes();
-        try {
-            setEditableAndDropdownColumns(visibleIndexes);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+        setEditableAndDropdownColumns(visibleIndexes);
         this.revalidate();
         this.repaint();
 
@@ -653,127 +657,132 @@ public class MainWindow extends JFrame implements ActionListener {
     }
 
     // Populate dates table with colored days
-    public void populateDatesTable() throws SQLException {
+    public void populateDatesTable() {
         ArrayList<DateRange> dates = new ArrayList<>();
         int buildIndex = 1;
         int finishIndex = 1;
         int extraIndex = 1;
         int installIndex = 1;
-        while(jobBoardResultSet.next()){
-            buildIndex = jobBoardResultSet.findColumn("build");
-            finishIndex = jobBoardResultSet.findColumn("finish");
-            extraIndex = jobBoardResultSet.findColumn("extra");
-            installIndex = jobBoardResultSet.findColumn("install");
+        try {
+            jobBoardResultSet.beforeFirst();
+            while (jobBoardResultSet.next()) {
+                buildIndex = jobBoardResultSet.findColumn("build");
+                finishIndex = jobBoardResultSet.findColumn("finish");
+                extraIndex = jobBoardResultSet.findColumn("extra");
+                installIndex = jobBoardResultSet.findColumn("install");
 
-            Date sqlDate = jobBoardResultSet.getDate("due_date");
-            LocalDate dueDate = sqlDate.toLocalDate();
+                Date sqlDate = jobBoardResultSet.getDate("due_date");
+                LocalDate dueDate = sqlDate.toLocalDate();
 
-            // get amount of days for each section of time from data table
-            int buildDays = (int) jobBoardResultSet.getInt(buildIndex);
-            int finishDays = (int) jobBoardResultSet.getInt(finishIndex);
-            int extraDays = (int) jobBoardResultSet.getInt(extraIndex);
-            int installDays = (int) jobBoardResultSet.getInt(installIndex);
-            if(jobBoardResultSet.wasNull())
-                installDays = 1;
-            int daysBack = buildDays + finishDays + extraDays;
-            int daysForward = installDays - 1;
+                // get amount of days for each section of time from data table
+                int buildDays = (int) jobBoardResultSet.getInt(buildIndex);
+                int finishDays = (int) jobBoardResultSet.getInt(finishIndex);
+                int extraDays = (int) jobBoardResultSet.getInt(extraIndex);
+                int installDays = (int) jobBoardResultSet.getInt(installIndex);
+                if (jobBoardResultSet.wasNull())
+                    installDays = 1;
+                int daysBack = buildDays + finishDays + extraDays;
+                int daysForward = installDays - 1;
 
-            // check if the due date is a saturday
-            boolean isDueDateSaturday = (dueDate.getDayOfWeek() == DayOfWeek.SATURDAY);
+                // check if the due date is a saturday
+                boolean isDueDateSaturday = (dueDate.getDayOfWeek() == DayOfWeek.SATURDAY);
 
-            // calculate what the start/end date for all sections of time
-            // this calculation will only count weekdays as working days unless the due date is a saturday
-            LocalDate buildStart = dueDate;
-            LocalDate finishStart = dueDate;
-            LocalDate extraStart = dueDate;
-            LocalDate installEnd = dueDate;
-            // calculate buildStart
-            for (int j = 0; j >= -(daysBack); ) {
-                buildStart = buildStart.minusDays(1);
-                if (!buildStart.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !buildStart.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
-                    j--;
+                // calculate what the start/end date for all sections of time
+                // this calculation will only count weekdays as working days unless the due date is a saturday
+                LocalDate buildStart = dueDate;
+                LocalDate finishStart = dueDate;
+                LocalDate extraStart = dueDate;
+                LocalDate installEnd = dueDate;
+                // calculate buildStart
+                for (int j = 0; j >= -(daysBack); ) {
+                    buildStart = buildStart.minusDays(1);
+                    if (!buildStart.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !buildStart.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+                        j--;
+                    }
                 }
-            }
-            // calculate finishStart
-            for (int j = 0; j >= -(daysBack - buildDays); ) {
-                finishStart = finishStart.minusDays(1);
-                if (!finishStart.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !finishStart.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
-                    j--;
+                // calculate finishStart
+                for (int j = 0; j >= -(daysBack - buildDays); ) {
+                    finishStart = finishStart.minusDays(1);
+                    if (!finishStart.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !finishStart.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+                        j--;
+                    }
                 }
-            }
-            // calculate extraStart
-            for (int j = 0; j >= -(daysBack - buildDays - finishDays); ) {
-                extraStart = extraStart.minusDays(1);
-                if (!extraStart.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !extraStart.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
-                    j--;
+                // calculate extraStart
+                for (int j = 0; j >= -(daysBack - buildDays - finishDays); ) {
+                    extraStart = extraStart.minusDays(1);
+                    if (!extraStart.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !extraStart.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+                        j--;
+                    }
                 }
-            }
-            // calculate installEnd (since install start is due date)
-            // for now this is unnecessary, but it could be useful in future
-            for (int j = 0; j < daysForward; ) {
-                installEnd = installEnd.plusDays(1);
-                if (!installEnd.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !installEnd.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
-                    j++;
-                } else if (installEnd.getDayOfWeek().equals(DayOfWeek.SATURDAY) && dueDate.getDayOfWeek().equals(DayOfWeek.SATURDAY)) {
-                    j++;
+                // calculate installEnd (since install start is due date)
+                // for now this is unnecessary, but it could be useful in future
+                for (int j = 0; j < daysForward; ) {
+                    installEnd = installEnd.plusDays(1);
+                    if (!installEnd.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !installEnd.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+                        j++;
+                    } else if (installEnd.getDayOfWeek().equals(DayOfWeek.SATURDAY) && dueDate.getDayOfWeek().equals(DayOfWeek.SATURDAY)) {
+                        j++;
+                    }
                 }
-            }
 
-            // Starting from each time period, add all the weekdays to a respective list based on when each period starts
-            // Only weekdays will be added based on the amount of days in each time period
-            // Add a saturday to that list only if the saturday is a due date
-            ArrayList<LocalDate> buildDates = new ArrayList<>();
-            ArrayList<LocalDate> finishDates = new ArrayList<>();
-            ArrayList<LocalDate> extraDates = new ArrayList<>();
-            ArrayList<LocalDate> installDates = new ArrayList<>();
-            LocalDate tempDatePopulator = buildStart;
-            // Populate the buildDates
-            for (int j = 0; j < (daysBack - finishDays); ) {
-                tempDatePopulator = tempDatePopulator.plusDays(1);
-                if (!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
-                    j++;
-                    buildDates.add(tempDatePopulator);
+                // Starting from each time period, add all the weekdays to a respective list based on when each period starts
+                // Only weekdays will be added based on the amount of days in each time period
+                // Add a saturday to that list only if the saturday is a due date
+                ArrayList<LocalDate> buildDates = new ArrayList<>();
+                ArrayList<LocalDate> finishDates = new ArrayList<>();
+                ArrayList<LocalDate> extraDates = new ArrayList<>();
+                ArrayList<LocalDate> installDates = new ArrayList<>();
+                LocalDate tempDatePopulator = buildStart;
+                // Populate the buildDates
+                for (int j = 0; j < (daysBack - finishDays); ) {
+                    tempDatePopulator = tempDatePopulator.plusDays(1);
+                    if (!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+                        j++;
+                        buildDates.add(tempDatePopulator);
+                    }
                 }
-            }
-            // Populate the finishDates
-            tempDatePopulator = finishStart;
-            for (int j = 0; j < (finishDays); ) {
-                tempDatePopulator = tempDatePopulator.plusDays(1);
-                if (!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
-                    j++;
-                    finishDates.add(tempDatePopulator);
+                // Populate the finishDates
+                tempDatePopulator = finishStart;
+                for (int j = 0; j < (finishDays); ) {
+                    tempDatePopulator = tempDatePopulator.plusDays(1);
+                    if (!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+                        j++;
+                        finishDates.add(tempDatePopulator);
+                    }
                 }
-            }
-            tempDatePopulator = extraStart;
-            for (int j = 0; j < (extraDays); ) {
-                tempDatePopulator = tempDatePopulator.plusDays(1);
-                if (!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
-                    j++;
-                    extraDates.add(tempDatePopulator);
+                tempDatePopulator = extraStart;
+                for (int j = 0; j < (extraDays); ) {
+                    tempDatePopulator = tempDatePopulator.plusDays(1);
+                    if (!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+                        j++;
+                        extraDates.add(tempDatePopulator);
+                    }
                 }
-            }
-            // Populate the installDates
-            // the due date is the first install day and if the due date is a saturday it will be added to the list
-            tempDatePopulator = dueDate;
-            for (int j = 0; j < (installDays); ) {
-                if (!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
-                    j++;
-                    installDates.add(tempDatePopulator);
-                } else if (tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && dueDate.getDayOfWeek().equals(DayOfWeek.SATURDAY)) {
-                    j++;
-                    installDates.add(tempDatePopulator);
+                // Populate the installDates
+                // the due date is the first install day and if the due date is a saturday it will be added to the list
+                tempDatePopulator = dueDate;
+                for (int j = 0; j < (installDays); ) {
+                    if (!tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && !tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SUNDAY)) {
+                        j++;
+                        installDates.add(tempDatePopulator);
+                    } else if (tempDatePopulator.getDayOfWeek().equals(DayOfWeek.SATURDAY) && dueDate.getDayOfWeek().equals(DayOfWeek.SATURDAY)) {
+                        j++;
+                        installDates.add(tempDatePopulator);
+                    }
+                    tempDatePopulator = tempDatePopulator.plusDays(1);
                 }
-                tempDatePopulator = tempDatePopulator.plusDays(1);
+                dates.add(new DateRange(dueDate, buildDates, finishDates, extraDates, installDates, isDueDateSaturday));
             }
-            dates.add(new DateRange(dueDate, buildDates, finishDates, extraDates, installDates, isDueDateSaturday));
+        }catch (SQLException e){
+            JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+            System.exit(1);
         }
-        jobBoardResultSet.beforeFirst();
 
         // Apply the dates for each time period to the custom renderer so it can draw the colored squares
         TableCustom.applyDates(datesTable, dates);
     }
 
-    public void populateTimeOffTable() throws SQLException {
+    public void populateTimeOffTable() {
         SelectQueryBuilder qb = new SelectQueryBuilder();
         qb.select("*");
         qb.from("time_off");
@@ -782,26 +791,31 @@ public class MainWindow extends JFrame implements ActionListener {
         ArrayList<TimeOffDates> timeOffDatesList = new ArrayList<>();
 
         int personIndex = 1;
-        while(rs.next()){
-            personIndex = rs.findColumn("worker");
+        try {
+            while (rs.next()) {
+                personIndex = rs.findColumn("worker");
 
-            Date sqlDate = rs.getDate("start_date");
-            LocalDate startDate = sqlDate.toLocalDate();
+                Date sqlDate = rs.getDate("start_date");
+                LocalDate startDate = sqlDate.toLocalDate();
 
-            sqlDate = rs.getDate("end_date");
-            LocalDate endDate = sqlDate.toLocalDate();
+                sqlDate = rs.getDate("end_date");
+                LocalDate endDate = sqlDate.toLocalDate();
 
-            ArrayList<LocalDate> timeOffDates = new ArrayList<>();
-            LocalDate currentDate = startDate;
+                ArrayList<LocalDate> timeOffDates = new ArrayList<>();
+                LocalDate currentDate = startDate;
 
-            while(currentDate.isBefore(endDate)){
-                if(currentDate.getDayOfWeek() != DayOfWeek.SATURDAY && currentDate.getDayOfWeek() != DayOfWeek.SUNDAY){
-                    timeOffDates.add(currentDate);
+                while (currentDate.isBefore(endDate)) {
+                    if (currentDate.getDayOfWeek() != DayOfWeek.SATURDAY && currentDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                        timeOffDates.add(currentDate);
+                    }
+                    currentDate = currentDate.plusDays(1);
                 }
-                currentDate = currentDate.plusDays(1);
+                timeOffDates.add(currentDate);
+                timeOffDatesList.add(new TimeOffDates(rs.getString(personIndex), timeOffDates));
             }
-            timeOffDates.add(currentDate);
-            timeOffDatesList.add(new TimeOffDates(rs.getString(personIndex), timeOffDates));
+        }catch (SQLException e){
+            JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+            System.exit(1);
         }
         TableCustom.applyTimeOffDates(timeOffTable, timeOffDatesList);
     }
@@ -853,18 +867,26 @@ public class MainWindow extends JFrame implements ActionListener {
         splitPane.setDividerLocation(totalWidth);
     }
 
-    public void setEditableAndDropdownColumns(ArrayList<Integer> visibleIndexes) throws IOException, SQLException {
+    public void setEditableAndDropdownColumns(ArrayList<Integer> visibleIndexes){
+
         Properties editableProps = new Properties();
-        FileInputStream editableInput = new FileInputStream(PropertiesManager.CELL_EDITABLE_PROPERTIES_FILE_PATH);
-        editableProps.load(editableInput);
-
         Properties dropdownProps = new Properties();
-        FileInputStream dropdownInput = new FileInputStream(PropertiesManager.CELL_DROPDOWN_PROPERTIES_FILE_PATH);
-        dropdownProps.load(dropdownInput);
-
         Properties dropdownListProps = new Properties();
-        FileInputStream dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
-        dropdownListProps.load(dropdownListInput);
+        FileInputStream editableInput = null;
+        FileInputStream dropdownInput = null;
+        FileInputStream dropdownListInput = null;
+        try {
+            editableInput = new FileInputStream(PropertiesManager.CELL_EDITABLE_PROPERTIES_FILE_PATH);
+            editableProps.load(editableInput);
+
+            dropdownInput = new FileInputStream(PropertiesManager.CELL_DROPDOWN_PROPERTIES_FILE_PATH);
+            dropdownProps.load(dropdownInput);
+
+            dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+            dropdownListProps.load(dropdownListInput);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(null, e.getMessage());
+        }
 
         DefaultCellEditor oldEditor = (DefaultCellEditor) dataTable.getColumnModel().getColumn(0).getCellEditor();
         DefaultCellEditor editor = null;
@@ -880,186 +902,193 @@ public class MainWindow extends JFrame implements ActionListener {
             dataTable.setRowSelectionAllowed(true);
         }
 
-        jobBoardResultSet.beforeFirst();
-        for(int i = 0; i < dataTableModel.getColumnCount(); i++){
-            String columnLabel = jobBoardResultSet.getMetaData().getColumnLabel(visibleIndexes.get(i));
-            String isEditableValue = editableProps.getProperty(columnLabel);
-            String isDropdownValue = dropdownProps.getProperty(columnLabel);
-            JComponent text = new JComponent(){};
-            if("t".equals(isDropdownValue)){
-                String columnName = columnLabel;
-                if(columnLabel.equals("mechanic"))
-                    columnName = "worker";
-                String dropdownList = dropdownListProps.getProperty(columnName + "_list.dropdown.options") != null ? dropdownListProps.getProperty(columnName + "_list.dropdown.options") : ",none";
+        try {
+            jobBoardResultSet.beforeFirst();
+            for (int i = 0; i < dataTableModel.getColumnCount(); i++) {
+                String columnLabel = jobBoardResultSet.getMetaData().getColumnLabel(visibleIndexes.get(i));
+                String isEditableValue = editableProps.getProperty(columnLabel);
+                String isDropdownValue = dropdownProps.getProperty(columnLabel);
+                JComponent text = new JComponent() {
+                };
+                if ("t".equals(isDropdownValue)) {
+                    String columnName = columnLabel;
+                    if (columnLabel.equals("mechanic"))
+                        columnName = "worker";
+                    String dropdownList = dropdownListProps.getProperty(columnName + "_list.dropdown.options") != null ? dropdownListProps.getProperty(columnName + "_list.dropdown.options") : ",none";
 
-                JComboBox comboBox = new JComboBox<>(dropdownList.split(","));
-                Component editorComp = comboBox.getEditor().getEditorComponent();
+                    JComboBox comboBox = new JComboBox<>(dropdownList.split(","));
+                    Component editorComp = comboBox.getEditor().getEditorComponent();
 
-                if(editorComp instanceof JTextField textField){
-                    textField.setPreferredSize(new Dimension(200, 30));
-                    textField.setCaretColor(Color.white);
-                    textField.setBackground(new Color(60, 60, 60));
-                    textField.setForeground(Color.WHITE);
-                    textField.setFont(PLAIN_FONT);
-                    textField.setBorder(new EmptyBorder(0,0,0,0));
-                }
-
-                comboBox.setPreferredSize(new Dimension(200, 30));
-                comboBox.setEditable(false);
-                comboBox.setBackground(new Color(60, 60, 60));
-                comboBox.setForeground(Color.WHITE);
-                comboBox.setFont(PLAIN_FONT);
-                comboBox.setBorder(new EmptyBorder(5, 5, 5, 5));
-                comboBox.setMaximumRowCount(10);
-
-                if("t".equals(isEditableValue)){
-                    comboBox.setEditable(true);
-                }
-
-
-                final boolean[] enterPressed = {false};
-                final int[] currentRow = {0};
-                final int[] currentCol = {0};
-                final String[] currentValue = {""};
-                editor = new DefaultCellEditor(comboBox){
-                    @Override
-                    public boolean isCellEditable(EventObject anEvent) {
-                        return super.isCellEditable(anEvent);
+                    if (editorComp instanceof JTextField textField) {
+                        textField.setPreferredSize(new Dimension(200, 30));
+                        textField.setCaretColor(Color.white);
+                        textField.setBackground(new Color(60, 60, 60));
+                        textField.setForeground(Color.WHITE);
+                        textField.setFont(PLAIN_FONT);
+                        textField.setBorder(new EmptyBorder(0, 0, 0, 0));
                     }
 
-                    @Override
-                    public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
-                        currentRow[0] = row;
-                        currentCol[0] = column;
-                        currentValue[0] = value != null ? value.toString() : "";
-                        enterPressed[0] = false;
+                    comboBox.setPreferredSize(new Dimension(200, 30));
+                    comboBox.setEditable(false);
+                    comboBox.setBackground(new Color(60, 60, 60));
+                    comboBox.setForeground(Color.WHITE);
+                    comboBox.setFont(PLAIN_FONT);
+                    comboBox.setBorder(new EmptyBorder(5, 5, 5, 5));
+                    comboBox.setMaximumRowCount(10);
+
+                    if ("t".equals(isEditableValue)) {
+                        comboBox.setEditable(true);
+                    }
+
+
+                    final boolean[] enterPressed = {false};
+                    final int[] currentRow = {0};
+                    final int[] currentCol = {0};
+                    final String[] currentValue = {""};
+                    editor = new DefaultCellEditor(comboBox) {
+                        @Override
+                        public boolean isCellEditable(EventObject anEvent) {
+                            return super.isCellEditable(anEvent);
+                        }
+
+                        @Override
+                        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+                            currentRow[0] = row;
+                            currentCol[0] = column;
+                            currentValue[0] = value != null ? value.toString() : "";
+                            enterPressed[0] = false;
 
 //                        SwingUtilities.invokeLater(()->{
 //                            comboBox.setCaretPosition(comboBox.getText().length());
 //                        });
 
-                        return super.getTableCellEditorComponent(table, value, isSelected, row, column);
-                    }
-                    @Override
-                    public boolean stopCellEditing() {
-                        String newValue = comboBox.getSelectedItem() != null ? comboBox.getSelectedItem().toString() : "";
+                            return super.getTableCellEditorComponent(table, value, isSelected, row, column);
+                        }
 
-                        if (!currentValue[0].equals(newValue)) {
-                            UpdateQueryBuilder qb = new UpdateQueryBuilder();
-                            qb.updateTable("job_board");
-                            try {
-                                qb.setColNames(dataTable.getColumnName(currentCol[0]).replace(" ", "_"));
-                                qb.setValues(comboBox.getEditor().getItem().toString());
-                                TableColumn targetColumn = dataTable.getColumn("jwo");
-                                TableColumnModel columnModel = dataTable.getColumnModel();
-                                int columnIndex = columnModel.getColumnIndex(targetColumn.getIdentifier());
-                                qb.where("jwo = "+ dataTable.getValueAt(currentRow[0], columnIndex));
-                                database.sendUpdate(qb.build());
-                            } catch (SQLException e) {
-                                throw new RuntimeException(e);
+                        @Override
+                        public boolean stopCellEditing() {
+                            String newValue = comboBox.getSelectedItem() != null ? comboBox.getSelectedItem().toString() : "";
+
+                            if (!currentValue[0].equals(newValue)) {
+                                UpdateQueryBuilder qb = new UpdateQueryBuilder();
+                                qb.updateTable("job_board");
+                                try {
+                                    qb.setColNames(dataTable.getColumnName(currentCol[0]).replace(" ", "_"));
+                                    qb.setValues(comboBox.getEditor().getItem().toString());
+                                    TableColumn targetColumn = dataTable.getColumn("jwo");
+                                    TableColumnModel columnModel = dataTable.getColumnModel();
+                                    int columnIndex = columnModel.getColumnIndex(targetColumn.getIdentifier());
+                                    qb.where("jwo = " + dataTable.getValueAt(currentRow[0], columnIndex));
+                                    database.sendUpdate(qb.build());
+                                } catch (SQLException e) {
+                                    JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+                                    System.exit(1);
+                                }
+                                return super.stopCellEditing();
+                            } else {
+                                cancelCellEditing();
+                                return super.stopCellEditing();
+                            }
+
+                        }
+                    };
+                    editor.setClickCountToStart(1);
+                    DefaultCellEditor finalEditor = editor;
+                    comboBox.addPopupMenuListener(new PopupMenuListener() {
+                        private Object previousSelection = null;
+
+                        @Override
+                        public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                            previousSelection = comboBox.getSelectedItem();
+                        }
+
+                        @Override
+                        public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                            Object currentSelection = comboBox.getSelectedItem();
+                            if (currentSelection != null && !currentSelection.equals(previousSelection)) {
+                                //SwingUtilities.invokeLater(()->finalEditor.stopCellEditing());
+                            }
+                        }
+
+                        @Override
+                        public void popupMenuCanceled(PopupMenuEvent e) {
+                        }
+                    });
+                    text = comboBox;
+                } else if ("t".equals(isEditableValue)) {
+                    JTextField editorField = new JTextField();
+                    editorField.setBackground(new Color(24, 24, 24));
+                    editorField.setForeground(new Color(255, 255, 255));
+                    editorField.setFont(PLAIN_FONT);
+                    editorField.setBorder(new LineBorder(Color.GREEN, 2));
+                    editorField.setCaretPosition(editorField.getText().length());
+                    editorField.setCaretColor(new Color(255, 255, 255));
+
+                    final boolean[] enterPressed = {false};
+                    final int[] currentRow = {0};
+                    final int[] currentCol = {0};
+                    final String[] currentValue = {""};
+                    editor = new DefaultCellEditor(editorField) {
+
+                        @Override
+                        public boolean isCellEditable(EventObject anEvent) {
+                            return super.isCellEditable(anEvent);
+                        }
+
+                        @Override
+                        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+                            currentRow[0] = row;
+                            currentCol[0] = column;
+                            currentValue[0] = value != null ? value.toString() : "";
+
+                            SwingUtilities.invokeLater(() -> {
+                                editorField.setCaretPosition(editorField.getText().length());
+                            });
+
+                            return super.getTableCellEditorComponent(table, value, isSelected, row, column);
+                        }
+
+                        @Override
+                        public boolean stopCellEditing() {
+                            String newValue = editorField.getText() != null ? editorField.getText() : "";
+
+                            if (!currentValue[0].equals(newValue)) {
+                                UpdateQueryBuilder qb = new UpdateQueryBuilder();
+                                qb.updateTable("job_board");
+                                try {
+                                    qb.setColNames(dataTable.getColumnName(currentCol[0]).replace(" ", "_"));
+                                    qb.setValues(editorField.getText());
+                                    TableColumn targetColumn = dataTable.getColumn("jwo");
+                                    TableColumnModel columnModel = dataTable.getColumnModel();
+                                    int columnIndex = columnModel.getColumnIndex(targetColumn.getIdentifier());
+                                    qb.where("jwo = " + dataTable.getValueAt(currentRow[0], columnIndex));
+                                    database.sendUpdate(qb.build());
+                                } catch (SQLException e) {
+                                    JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+                                    System.exit(1);
+                                }
+                            } else {
+                                cancelCellEditing();
+                                return super.stopCellEditing();
                             }
                             return super.stopCellEditing();
                         }
-                        else{
-                            cancelCellEditing();
-                            return super.stopCellEditing();
+
+                        @Override
+                        public void cancelCellEditing() {
+                            super.cancelCellEditing();
                         }
+                    };
+                    editor.setClickCountToStart(1);
+                } else {
+                    editor = oldEditor;
+                }
 
-                    }
-                };
-                editor.setClickCountToStart(1);
-                DefaultCellEditor finalEditor = editor;
-                comboBox.addPopupMenuListener(new PopupMenuListener() {
-                    private Object previousSelection = null;
-                    @Override
-                    public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
-                        previousSelection = comboBox.getSelectedItem();
-                    }
-
-                    @Override
-                    public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
-                        Object currentSelection = comboBox.getSelectedItem();
-                        if (currentSelection != null && !currentSelection.equals(previousSelection)) {
-                            //SwingUtilities.invokeLater(()->finalEditor.stopCellEditing());
-                        }
-                    }
-
-                    @Override
-                    public void popupMenuCanceled(PopupMenuEvent e) {
-                    }
-                });
-                text = comboBox;
+                dataTable.getColumnModel().getColumn(i).setCellEditor(editor);
             }
-            else if("t".equals(isEditableValue)){
-                JTextField editorField = new JTextField();
-                editorField.setBackground(new Color(24, 24, 24));
-                editorField.setForeground(new Color(255,255,255));
-                editorField.setFont(PLAIN_FONT);
-                editorField.setBorder(new LineBorder(Color.GREEN, 2));
-                editorField.setCaretPosition(editorField.getText().length());
-                editorField.setCaretColor(new Color(255,255,255));
-
-                final boolean[] enterPressed = {false};
-                final int[] currentRow = {0};
-                final int[] currentCol = {0};
-                final String[] currentValue = {""};
-                editor = new DefaultCellEditor(editorField){
-
-                    @Override
-                    public boolean isCellEditable(EventObject anEvent) {
-                        return super.isCellEditable(anEvent);
-                    }
-
-                    @Override
-                    public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
-                        currentRow[0] = row;
-                        currentCol[0] = column;
-                        currentValue[0] = value != null ? value.toString() : "";
-
-                        SwingUtilities.invokeLater(()->{
-                            editorField.setCaretPosition(editorField.getText().length());
-                        });
-
-                        return super.getTableCellEditorComponent(table, value, isSelected, row, column);
-                    }
-                    @Override
-                    public boolean stopCellEditing() {
-                        String newValue = editorField.getText() != null ? editorField.getText() : "";
-
-                        if(!currentValue[0].equals(newValue)){
-                            UpdateQueryBuilder qb = new UpdateQueryBuilder();
-                            qb.updateTable("job_board");
-                            try {
-                                qb.setColNames(dataTable.getColumnName(currentCol[0]).replace(" ", "_"));
-                                qb.setValues(editorField.getText());
-                                TableColumn targetColumn = dataTable.getColumn("jwo");
-                                TableColumnModel columnModel = dataTable.getColumnModel();
-                                int columnIndex = columnModel.getColumnIndex(targetColumn.getIdentifier());
-                                qb.where("jwo = "+ dataTable.getValueAt(currentRow[0], columnIndex));
-                                database.sendUpdate(qb.build());
-                            } catch (SQLException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }
-                        else{
-                            cancelCellEditing();
-                            return super.stopCellEditing();
-                        }
-                        return super.stopCellEditing();
-                    }
-
-                    @Override
-                    public void cancelCellEditing() {
-                        super.cancelCellEditing();
-                    }
-                };
-                editor.setClickCountToStart(1);
-            }
-            else{
-                editor = oldEditor;
-            }
-
-            dataTable.getColumnModel().getColumn(i).setCellEditor(editor);
+        }catch (SQLException e){
+            JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+            System.exit(1);
         }
 
     }
@@ -1067,9 +1096,21 @@ public class MainWindow extends JFrame implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == addJobButton){
+            for(Frame frame : JFrame.getFrames()){
+                if(frame instanceof AddJobWindow){
+                    frame.toFront();
+                    return;
+                }
+            }
             new AddJobWindow(database, jobBoardResultSet);
         }
         if(e.getSource() == updateJobButton){
+            for(Frame frame : JFrame.getFrames()){
+                if(frame instanceof UpdateJobWindow){
+                    frame.toFront();
+                    return;
+                }
+            }
             int selectedRow = dataTable.getSelectedRow();
             if(selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
                 String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
@@ -1077,6 +1118,12 @@ public class MainWindow extends JFrame implements ActionListener {
             }
         }
         if(e.getSource() == deleteButton){
+            for(Frame frame : JFrame.getFrames()){
+                if(frame instanceof DeleteJobWindow){
+                    frame.toFront();
+                    return;
+                }
+            }
             int selectedRow = dataTable.getSelectedRow();
             if(selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
                 String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
@@ -1105,6 +1152,12 @@ public class MainWindow extends JFrame implements ActionListener {
         }
 
         if(e.getSource() == timeOffButton){
+            for(Frame frame : JFrame.getFrames()){
+                if(frame instanceof AddTimeOffWindow){
+                    frame.toFront();
+                    return;
+                }
+            }
             new AddTimeOffWindow(database);
         }
 

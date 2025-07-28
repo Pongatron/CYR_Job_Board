@@ -12,6 +12,7 @@ import java.awt.event.ActionListener;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -35,18 +36,14 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
     private String selectedJwo;
     ArrayList<String> requiredCols;
     private static final Color UPDATE_PANEL_COLOR = new Color(40, 40, 40);
-    private DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("MM/dd/yy");
+    private DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("MM/dd/yyyy");
 
     public UpdateJobWindow(DatabaseInteraction db, ResultSet rs, String jwo){
         database = db;
         jobBoardResultSet = rs;
         selectedJwo = jwo;
         initializeComponents();
-        try {
-            addFields();
-        } catch (IOException | SQLException e) {
-            throw new RuntimeException(e);
-        }
+        addFields();
 
         JLabel headingText = new JLabel("Update Job", SwingConstants.CENTER);
         headingText.setForeground(new Color(0,100,180));
@@ -112,33 +109,47 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
         fields = new ArrayList<>();
     }
 
-    private void addFields() throws IOException, SQLException {
+    private void addFields()  {
 
-        jobBoardResultSet.beforeFirst();
         requiredCols = new ArrayList<>();
         String[] colOrder = PropertiesManager.getColumnOrder();
 
         Properties requiredProps = new Properties();
-        FileInputStream reqInput = new FileInputStream(PropertiesManager.COLUMN_REQUIRED_PROPERTIES_FILE_PATH);
-        requiredProps.load(reqInput);
-
         Properties visibleProps = new Properties();
-        FileInputStream visibleInput = new FileInputStream(PropertiesManager.MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH);
-        visibleProps.load(visibleInput);
-
         Properties dropdownProps = new Properties();
-        FileInputStream dropdownInput = new FileInputStream(PropertiesManager.MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH);
-        dropdownProps.load(dropdownInput);
-
         Properties dropdownListProps = new Properties();
-        FileInputStream dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
-        dropdownListProps.load(dropdownListInput);
+        FileInputStream reqInput = null;
+        FileInputStream visibleInput = null;
+        FileInputStream dropdownInput = null;
+        FileInputStream dropdownListInput = null;
+        OutputStream output = null;
+        try {
+            reqInput = new FileInputStream(PropertiesManager.COLUMN_REQUIRED_PROPERTIES_FILE_PATH);
+            requiredProps.load(reqInput);
+
+            visibleInput = new FileInputStream(PropertiesManager.MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH);
+            visibleProps.load(visibleInput);
+
+            dropdownInput = new FileInputStream(PropertiesManager.MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH);
+            dropdownProps.load(dropdownInput);
+
+            dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+            dropdownListProps.load(dropdownListInput);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(null, e.getMessage());
+        }
 
         ResultSetMetaData rsMeta = null;
-        while(jobBoardResultSet.next()) {
-            if (jobBoardResultSet.getObject("jwo").toString().equals(selectedJwo)) {
-                break;
+        try {
+            jobBoardResultSet.beforeFirst();
+            while (jobBoardResultSet.next()) {
+                if (jobBoardResultSet.getObject("jwo").toString().equals(selectedJwo)) {
+                    break;
+                }
             }
+        }catch (SQLException e){
+            JOptionPane.showMessageDialog(null, e.getMessage() + "\n for safety...");
+            System.exit(1);
         }
 
         for(String columnName : colOrder){
@@ -151,10 +162,10 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                     columnName += "*";
                 }
                 JLabel label = new JLabel(columnName);
-//                if(columnName.contains("*"))
-//                    label.setForeground(new Color(255, 50,50));
-//                else
-                label.setForeground(Color.white);
+                if(columnName.contains("*"))
+                    label.setForeground(new Color(255, 50,50));
+                else
+                    label.setForeground(Color.white);
                 label.setFont(new Font("SansSerif", Font.BOLD, 20));
 
                 JComponent text;
@@ -203,8 +214,15 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                 fields.add(panel);
                 fieldsPanel.add(panel);
 
-                int databaseColIndex = jobBoardResultSet.findColumn(columnName.replace("*", ""));
-                Object value = jobBoardResultSet.getObject(databaseColIndex);
+
+                Object value = null;
+                try {
+                    int databaseColIndex = jobBoardResultSet.findColumn(columnName.replace("*", ""));
+                    value = jobBoardResultSet.getObject(databaseColIndex);
+                } catch (SQLException e) {
+                    JOptionPane.showMessageDialog(null, e.getMessage());
+                    System.exit(1);
+                }
 
                 if(value instanceof java.sql.Date){
                     java.sql.Date sqlDate = (java.sql.Date) value;
@@ -248,7 +266,6 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                 if(isRequired){
                     if(str.isBlank()) {
                         notEmpty = false;
-                        //System.out.println("Empty required field: "+labelText);
                         missingFields += labelText + ", ";
                     }
                     else {
@@ -261,24 +278,32 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                     qb.setValues(str);
                 }
             }
-            try {
-                if(notEmpty) {
-                    //System.out.println("all required fields filled");
-                    qb.where("jwo=" + selectedJwo);
+
+            if(notEmpty) {
+                try {
+                    qb.where("jwo = "+ selectedJwo);
                     database.sendUpdate(qb.build());
                     dispose();
+                } catch (SQLException ex) {
+                    String msg = ex.getMessage();
+
+                    if(msg.toLowerCase().contains("syntax") && msg.toLowerCase().contains("integer")){
+                        msg = "JWO can only be a number";
+                    }
+                    else if(msg.toLowerCase().contains("syntax") && msg.toLowerCase().contains("date")){
+                        msg = "Fields with 'date' can only be in date format\ne.g. 12/12/12, 12-12-12, 12/12/2012, 12-12-2012";
+                    }
+                    else if(msg.toLowerCase().contains("date") && msg.toLowerCase().contains("range")){
+                        msg = "A date you entered is out of range";
+                    }
+
+                    JOptionPane.showMessageDialog(this, msg, null, JOptionPane.ERROR_MESSAGE);
+                }finally {
+                    database.closeResources();
                 }
-                else
-                    JOptionPane.showMessageDialog(null, "You have empty required values: "+missingFields, null, JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                String userMessage = ex.getMessage();
-                if(userMessage.toLowerCase().contains("duplicate") && userMessage.toLowerCase().contains("key")){
-                    userMessage = "A job with this JWO already exists.";
-                }
-                JOptionPane.showMessageDialog(this, userMessage, null, JOptionPane.ERROR_MESSAGE);
-            }finally {
-                database.closeResources();
+            }
+            else{
+                JOptionPane.showMessageDialog(this, "You're missing required values: " + missingFields, null, JOptionPane.ERROR_MESSAGE);
             }
         }
         if(e.getSource() == cancelButton){

@@ -8,10 +8,6 @@ public class TimeOffDates {
     private String person;
     private ArrayList<LocalDate> offDays;
 
-
-
-    private boolean isDueDateSaturday = false;
-
     public TimeOffDates(String person, ArrayList<LocalDate> offDays){
         this.person = person;
         this.offDays = offDays;

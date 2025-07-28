@@ -41,7 +41,6 @@ public class InsertQueryBuilder {
 
         sb.append(" VALUES (");
         for(int i = 0; i < values.size(); i++){
-
             if(!values.get(i).isBlank()){
                 sb.append("'");
                 sb.append(values.get(i));
@@ -56,8 +55,6 @@ public class InsertQueryBuilder {
             }
         }
         sb.append(");");
-
-        //System.out.println("InsertQueryBuilder: "+sb.toString());
         return sb.toString();
     }
 

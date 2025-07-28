@@ -60,13 +60,10 @@ public class TableCustomCellRenderer extends DefaultTableCellRenderer {
             String text = value.toString();
             label.setText(text);
 
-            // Calculate available space
             FontMetrics fm = label.getFontMetrics(label.getFont());
             int textWidth = fm.stringWidth(text);
-
             int columnWidth = table.getColumnModel().getColumn(column).getWidth();
 
-            // Subtract padding/insets (label padding + border)
             Insets insets = label.getInsets();
             int availableWidth = columnWidth - insets.left - insets.right;
 

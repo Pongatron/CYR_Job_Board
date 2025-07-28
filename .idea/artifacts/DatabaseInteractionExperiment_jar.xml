@@ -1,0 +1,10 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="DatabaseInteractionExperiment:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/DatabaseInteractionExperiment_jar</output-path>
+    <root id="archive" name="DatabaseInteractionExperiment.jar">
+      <element id="module-output" name="DatabaseInteractionExperiment" />
+      <element id="extracted-dir" path="$USER_HOME$/Downloads/postgresql-42.7.4.jar" path-in-jar="/" />
+      <element id="library" level="project" name="postgresql-42.7.4" />
+    </root>
+  </artifact>
+</component>

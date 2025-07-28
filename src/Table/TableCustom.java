@@ -41,7 +41,6 @@ public class TableCustom {
         }
 
         table.setDefaultRenderer(Object.class, cellRender);
-        table.setDefaultRenderer(Boolean.class, new BooleanCellRenderer(hoverRow));
 
         table.setShowVerticalLines(true);
         table.setGridColor(GRIDLINE_COLOR);
@@ -85,33 +84,6 @@ public class TableCustom {
                 }
             }
         });
-        adjustColumnWidths(table);
-    }
-
-    private static void adjustColumnWidths(JTable table) {
-
-        for(int col = 0; col < table.getColumnCount(); col++){
-            TableColumn tableColumn = table.getColumnModel().getColumn(col);
-            int preferredWidth = getMaxColumnWidth(table, col);
-            int minWidth = 60;
-            tableColumn.setPreferredWidth(preferredWidth + 10);
-            tableColumn.setMinWidth(minWidth);
-        }
-    }
-
-    private static int getMaxColumnWidth(JTable table, int col) {
-
-        int maxWidth = 0;
-        TableCellRenderer headerRenderer = table.getTableHeader().getDefaultRenderer();
-        Component headerComponent = headerRenderer.getTableCellRendererComponent(table, table.getColumnModel().getColumn(col).getHeaderValue(), false,false, 0, col);
-        maxWidth = Math.max(maxWidth, headerComponent.getPreferredSize().width);
-
-        for(int row = 0; row < table.getRowCount(); row++){
-            TableCellRenderer cellRenderer = table.getCellRenderer(row,col);
-            Component cellComponent = table.prepareRenderer(cellRenderer, row, col);
-            maxWidth = Math.max(maxWidth, cellComponent.getPreferredSize().width);
-        }
-        return maxWidth;
     }
 
     public static void applyDates(JTable table, ArrayList<DateRange> dates){

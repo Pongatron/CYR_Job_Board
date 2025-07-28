@@ -9,6 +9,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.sql.ResultSet;
@@ -31,13 +32,7 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
     public AddTimeOffWindow(DatabaseInteraction db){
         this.database = db;
         initializeComponents();
-        try {
-            addFields();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+        addFields();
 
         JLabel headingText = new JLabel("Add Time Off", SwingConstants.CENTER);
         headingText.setForeground(new Color(24, 80, 24));
@@ -103,42 +98,50 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
         fields = new ArrayList<>();
     }
 
-    private void addFields() throws IOException, SQLException {
+    private void addFields() {
         requiredCols = new ArrayList<>();
 
         ResultSet timeOffColResultSet = database.sendSelect("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'time_off';");
 
         Properties dropdownListProps = new Properties();
-        FileInputStream dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
-        dropdownListProps.load(dropdownListInput);
+        FileInputStream dropdownListInput = null;
+        OutputStream output = null;
+        try {
+            dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+            dropdownListProps.load(dropdownListInput);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(null, e.getMessage());
+        }
 
-        while(timeOffColResultSet.next()){
+        try {
+            timeOffColResultSet.beforeFirst();
+            while (timeOffColResultSet.next()) {
                 String columnName = timeOffColResultSet.getObject(1).toString();
 
                 JLabel label = new JLabel(columnName + "*");
-                label.setForeground(new Color(255, 50,50));
+                label.setForeground(new Color(255, 50, 50));
                 label.setFont(new Font("SansSerif", Font.BOLD, 20));
 
                 JComponent text;
-                if(label.getText().equals("worker*")){
+                if (label.getText().equals("worker*")) {
                     String dropdownList = dropdownListProps.getProperty(columnName.replace("*", "") + "_list.dropdown.options");
-                    if(dropdownList == null)
+                    if (dropdownList == null)
                         dropdownList = ",none";
 
                     JComboBox comboBox = new JComboBox<>(dropdownList.split(","));
                     Component editorComp = comboBox.getEditor().getEditorComponent();
 
-                    if(editorComp instanceof JTextField textField){
+                    if (editorComp instanceof JTextField textField) {
                         textField.setPreferredSize(new Dimension(200, 30));
                         textField.setCaretColor(Color.white);
                         textField.setBackground(new Color(60, 60, 60));
                         textField.setForeground(Color.WHITE);
                         textField.setFont(new Font("SansSerif", Font.PLAIN, 20));
-                        textField.setBorder(new EmptyBorder(0,0,0,0));
+                        textField.setBorder(new EmptyBorder(0, 0, 0, 0));
                     }
 
                     comboBox.setPreferredSize(new Dimension(200, 30));
-                    comboBox.setEditable(true);
+                    comboBox.setEditable(false);
                     comboBox.setBackground(new Color(60, 60, 60));
                     comboBox.setForeground(Color.WHITE);
                     comboBox.setFont(new Font("SansSerif", Font.PLAIN, 20));
@@ -165,6 +168,9 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
                 fields.add(panel);
                 fieldsPanel.add(panel);
 
+            }
+        }catch (SQLException e){
+            JOptionPane.showMessageDialog(null, e.getMessage());
         }
         database.closeResources();
     }
@@ -196,7 +202,6 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
                 if(isRequired){
                     if(str.isBlank()) {
                         notEmpty = false;
-                        //System.out.println("Empty required field: "+labelText);
                         missingFields += labelText + ", ";
                     }
                     else {
@@ -209,30 +214,32 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
                     qb.setValues(str);
                 }
             }
-            try {
+
                 if(notEmpty) {
-                    //System.out.println("all required fields filled");
-                    database.sendUpdate(qb.build());
-                    dispose();
+                    try{
+                        database.sendUpdate(qb.build());
+                        dispose();
+                    } catch (Exception ex) {
+                        String msg = ex.getMessage();
+
+                        if(msg.toLowerCase().contains("worker") && msg.toLowerCase().contains("null")){
+                            msg = "You must select an option from the worker dropdown";
+                        }
+                        else if(msg.toLowerCase().contains("start_date") && msg.toLowerCase().contains("null")){
+                            msg = "You must enter a start date";
+                        }
+                        else if(msg.toLowerCase().contains("end_date") && msg.toLowerCase().contains("null")){
+                            msg = "You must enter an end date";
+                        }
+
+                        JOptionPane.showMessageDialog(this, msg, null, JOptionPane.ERROR_MESSAGE);
+                    }finally {
+                        database.closeResources();
+                    }
                 }
                 else
-                    JOptionPane.showMessageDialog(null, "You have empty required values: "+missingFields, null, JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                String userMessage = ex.getMessage();
-                if(userMessage.toLowerCase().contains("worker") && userMessage.toLowerCase().contains("null")){
-                    userMessage = "You must select an option from the worker dropdown";
-                }
-                else if(userMessage.toLowerCase().contains("start_date") && userMessage.toLowerCase().contains("null")){
-                    userMessage = "You must enter a start date";
-                }
-                else if(userMessage.toLowerCase().contains("end_date") && userMessage.toLowerCase().contains("null")){
-                    userMessage = "You must enter an end date";
-                }
-                JOptionPane.showMessageDialog(this, userMessage, null, JOptionPane.ERROR_MESSAGE);
-            }finally {
-                database.closeResources();
-            }
+                    JOptionPane.showMessageDialog(null, "You're missing required values: "+missingFields, null, JOptionPane.INFORMATION_MESSAGE);
+
         }
         if(e.getSource() == cancelButton){
             dispose();

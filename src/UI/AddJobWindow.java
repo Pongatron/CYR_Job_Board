@@ -9,6 +9,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.sql.ResultSet;
@@ -32,13 +33,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
         database = db;
         jobBoardResultSet = rs;
         initializeComponents();
-        try {
-            addFields();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+        addFields();
 
         JLabel headingText = new JLabel("Add Job", SwingConstants.CENTER);
         headingText.setForeground(new Color(200,40,40));
@@ -104,25 +99,34 @@ public class AddJobWindow extends JFrame implements ActionListener {
         fields = new ArrayList<>();
     }
 
-    private void addFields() throws IOException, SQLException {
+    private void addFields() {
         requiredCols = new ArrayList<>();
         String[] colOrder = PropertiesManager.getColumnOrder();
 
         Properties requiredProps = new Properties();
-        FileInputStream reqInput = new FileInputStream(PropertiesManager.COLUMN_REQUIRED_PROPERTIES_FILE_PATH);
-        requiredProps.load(reqInput);
-
         Properties visibleProps = new Properties();
-        FileInputStream visibleInput = new FileInputStream(PropertiesManager.MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH);
-        visibleProps.load(visibleInput);
-
         Properties dropdownProps = new Properties();
-        FileInputStream dropdownInput = new FileInputStream(PropertiesManager.MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH);
-        dropdownProps.load(dropdownInput);
-
         Properties dropdownListProps = new Properties();
-        FileInputStream dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
-        dropdownListProps.load(dropdownListInput);
+        FileInputStream reqInput = null;
+        FileInputStream visibleInput = null;
+        FileInputStream dropdownInput = null;
+        FileInputStream dropdownListInput = null;
+        OutputStream output = null;
+        try {
+            reqInput = new FileInputStream(PropertiesManager.COLUMN_REQUIRED_PROPERTIES_FILE_PATH);
+            requiredProps.load(reqInput);
+
+            visibleInput = new FileInputStream(PropertiesManager.MENU_COLUMN_VISIBLE_PROPERTIES_FILE_PATH);
+            visibleProps.load(visibleInput);
+
+            dropdownInput = new FileInputStream(PropertiesManager.MENU_COLUMN_DROPDOWN_PROPERTIES_FILE_PATH);
+            dropdownProps.load(dropdownInput);
+
+            dropdownListInput = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+            dropdownListProps.load(dropdownListInput);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(null, e.getMessage());
+        }
 
         for(String columnName : colOrder){
             String requiredValue = requiredProps.getProperty(columnName);
@@ -211,13 +215,11 @@ public class AddJobWindow extends JFrame implements ActionListener {
                     str = textField.getText();
                 }
 
-
                 boolean isRequired = requiredCols.contains(labelText);
 
                 if(isRequired){
                     if(str.isBlank()) {
                         notEmpty = false;
-                        //System.out.println("Empty required field: "+labelText);
                         missingFields += labelText + ", ";
                     }
                     else {
@@ -230,23 +232,31 @@ public class AddJobWindow extends JFrame implements ActionListener {
                     qb.setValues(str);
                 }
             }
-            try {
-                if(notEmpty) {
-                    //System.out.println("all required fields filled");
+
+            if(notEmpty) {
+                try {
                     database.sendUpdate(qb.build());
                     dispose();
+                } catch (SQLException ex) {
+                    String msg = ex.getMessage();
+
+                    if(msg.toLowerCase().contains("syntax") && msg.toLowerCase().contains("integer")){
+                        msg = "JWO can only be a number";
+                    }
+                    else if(msg.toLowerCase().contains("syntax") && msg.toLowerCase().contains("date")){
+                        msg = "Fields with 'date' can only be in date format\ne.g. 12/12/12, 12-12-12, 12/12/2012, 12-12-2012";
+                    }
+                    else if(msg.toLowerCase().contains("date") && msg.toLowerCase().contains("range")){
+                        msg = "A date you entered is out of range";
+                    }
+
+                    JOptionPane.showMessageDialog(this, msg, null, JOptionPane.ERROR_MESSAGE);
+                }finally {
+                    database.closeResources();
                 }
-                else
-                    JOptionPane.showMessageDialog(null, "You have empty required values: "+missingFields, null, JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                String userMessage = ex.getMessage();
-                if(userMessage.toLowerCase().contains("duplicate") && userMessage.toLowerCase().contains("key")){
-                    userMessage = "A job with this JWO already exists.";
-                }
-                JOptionPane.showMessageDialog(this, userMessage, null, JOptionPane.ERROR_MESSAGE);
-            }finally {
-                database.closeResources();
+            }
+            else{
+                JOptionPane.showMessageDialog(this, "You're missing required values: " + missingFields, null, JOptionPane.ERROR_MESSAGE);
             }
         }
         if(e.getSource() == cancelButton){
