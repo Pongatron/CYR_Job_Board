@@ -55,6 +55,29 @@ public class TableCustomCellRenderer extends DefaultTableCellRenderer {
         }
         label.setFont(table.getFont());
 
+        String valueToColor = value != null ? value.toString() : "";
+        switch (valueToColor){
+            case "S":
+                label.setBackground(new Color(0,100,180));
+                break;
+            case "F":
+                label.setBackground(new Color(200,170,0));
+                break;
+            case "Com":
+                label.setBackground(new Color(200,40,40));
+                break;
+            case "Color":
+                label.setBackground(new Color(180,120,0));
+                break;
+            case "Clear":
+                label.setBackground(new Color(0,160,0));
+                break;
+            case "Sub":
+                label.setBackground(new Color(100,0,100));
+                break;
+            default:
+        }
+
         // Shows tooltip only if the text is too wide for the cell
         if (value != null) {
             String text = value.toString();

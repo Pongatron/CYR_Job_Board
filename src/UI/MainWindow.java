@@ -59,6 +59,8 @@ public class MainWindow extends JFrame implements ActionListener {
     private JPanel buttonPanel;
     private JPanel topTablePanel;
     private JPanel centerPanel;
+    private JPanel datesPanel;
+    private JPanel emptyPanel;
     private JButton addJobButton;
     private JButton updateJobButton;
     private JButton deleteButton;
@@ -142,11 +144,14 @@ public class MainWindow extends JFrame implements ActionListener {
         topContainerPanel.add(zoomLabel);
         topContainerPanel.add(plusZoomButton);
 
-        leftPanel.setPreferredSize(new Dimension(totalWidth, 100));
+        leftPanel.add(emptyPanel, BorderLayout.NORTH);
         leftPanel.add(tableScroll, BorderLayout.CENTER);
         setDividerLocation();
 
-        topTablePanel.add(timeOffScroll, BorderLayout.EAST);
+        datesPanel.add(timeOffScroll, BorderLayout.NORTH);
+        datesPanel.add(datesScroll, BorderLayout.CENTER);
+
+        //topTablePanel.add(timeOffScroll, BorderLayout.EAST);
         centerPanel.add(topTablePanel, BorderLayout.NORTH);
         centerPanel.add(splitPane, BorderLayout.CENTER);
 
@@ -221,6 +226,14 @@ public class MainWindow extends JFrame implements ActionListener {
         buttonPanel.setPreferredSize(BUTTON_PANEL_PREF_SIZE);
         buttonPanel.setBorder(new EmptyBorder(0,20,0,20));
         buttonPanel.setBackground(new Color(24,24,24));
+
+        datesPanel = new JPanel();
+        datesPanel.setLayout(new BorderLayout());
+        datesPanel.setBackground(new Color(24,24,24));
+
+        emptyPanel = new JPanel();
+        emptyPanel.setPreferredSize(timeOffTable.getPreferredSize());
+        emptyPanel.setBackground(new Color(24,24,24));
 
         addJobButton = new JButton("Add Job");
         addJobButton.setBackground(new Color(220, 46, 35));
@@ -307,7 +320,7 @@ public class MainWindow extends JFrame implements ActionListener {
         minusZoomButton.addActionListener(this);
 
         tableScroll = new JScrollPane(dataTable);
-        tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         tableScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         tableScroll.setPreferredSize(TABLE_SCROLL_PREF_SIZE);
         tableScroll.getViewport().setBackground(new Color(24,24,24));
@@ -328,7 +341,7 @@ public class MainWindow extends JFrame implements ActionListener {
         timeOffScroll.getVerticalScrollBar().setBackground(new Color(24,24,24));
         timeOffScroll.getHorizontalScrollBar().setBackground(new Color(24,24,24));
 
-        splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, datesScroll);
+        splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, datesPanel);
         splitPane.setDividerSize(5);
         splitPane.setBorder(null);
 
@@ -613,6 +626,7 @@ public class MainWindow extends JFrame implements ActionListener {
         dataTable.setRowHeight(rowHeight);
         datesTable.setRowHeight(rowHeight);
         timeOffTable.setRowHeight(zoomedDateCellWidth * 2);
+        emptyPanel.setPreferredSize(timeOffTable.getPreferredSize());
     }
 
     public void applyZoom(){
@@ -1093,41 +1107,60 @@ public class MainWindow extends JFrame implements ActionListener {
 
     }
 
+    private AddJobWindow addJobWindow = null;
+    private UpdateJobWindow updateJobWindow = null;
+    private DeleteJobWindow deleteJobWindow = null;
+    private AddTimeOffWindow addTimeOffWindow = null;
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == addJobButton){
-            for(Frame frame : JFrame.getFrames()){
-                if(frame instanceof AddJobWindow){
-                    frame.toFront();
-                    return;
-                }
+            if(addJobWindow == null || !addJobWindow.isDisplayable()) {
+                addJobWindow = new AddJobWindow(database, jobBoardResultSet);
+                addJobWindow.addWindowListener(new WindowAdapter() {
+                    @Override
+                    public void windowClosed(WindowEvent e) {
+                        updateJobWindow = null;
+                    }
+                });
             }
-            new AddJobWindow(database, jobBoardResultSet);
+            else{
+                addJobWindow.toFront();
+            }
         }
         if(e.getSource() == updateJobButton){
-            for(Frame frame : JFrame.getFrames()){
-                if(frame instanceof UpdateJobWindow){
-                    frame.toFront();
-                    return;
+            if(updateJobWindow == null || !updateJobWindow.isDisplayable()) {
+                int selectedRow = dataTable.getSelectedRow();
+                if (selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
+                    String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
+                    updateJobWindow = new UpdateJobWindow(database, jobBoardResultSet, selectedJwo);
+                    updateJobWindow.addWindowListener(new WindowAdapter() {
+                        @Override
+                        public void windowClosed(WindowEvent e) {
+                            updateJobWindow = null;
+                        }
+                    });
                 }
             }
-            int selectedRow = dataTable.getSelectedRow();
-            if(selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
-                String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
-                new UpdateJobWindow(database, jobBoardResultSet, selectedJwo);
+            else{
+                updateJobWindow.toFront();
             }
         }
         if(e.getSource() == deleteButton){
-            for(Frame frame : JFrame.getFrames()){
-                if(frame instanceof DeleteJobWindow){
-                    frame.toFront();
-                    return;
+            if(deleteJobWindow == null || !deleteJobWindow.isDisplayable()) {
+                int selectedRow = dataTable.getSelectedRow();
+                if(selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
+                    String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
+                    deleteJobWindow = new DeleteJobWindow(selectedJwo);
+                    deleteJobWindow.addWindowListener(new WindowAdapter() {
+                        @Override
+                        public void windowClosed(WindowEvent e) {
+                            deleteJobWindow = null;
+                        }
+                    });
                 }
             }
-            int selectedRow = dataTable.getSelectedRow();
-            if(selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
-                String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
-                new DeleteJobWindow(selectedJwo);
+            else {
+                deleteJobWindow.toFront();
             }
         }
         if(e.getSource() == jwoFilterButton){
@@ -1152,13 +1185,18 @@ public class MainWindow extends JFrame implements ActionListener {
         }
 
         if(e.getSource() == timeOffButton){
-            for(Frame frame : JFrame.getFrames()){
-                if(frame instanceof AddTimeOffWindow){
-                    frame.toFront();
-                    return;
-                }
+            if(addTimeOffWindow == null || !addTimeOffWindow.isDisplayable()) {
+                addTimeOffWindow = new AddTimeOffWindow(database);
+                addTimeOffWindow.addWindowListener(new WindowAdapter() {
+                    @Override
+                    public void windowClosed(WindowEvent e) {
+                        addTimeOffWindow = null;
+                    }
+                });
             }
-            new AddTimeOffWindow(database);
+            else{
+                addTimeOffWindow.toFront();
+            }
         }
 
         if(e.getSource() == plusZoomButton) {

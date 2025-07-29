@@ -18,12 +18,14 @@ public class Main {
         // create a directory for properties files
         File dir = new File(APP_DATA_DIR);
         if (!dir.exists()) dir.mkdirs();
-
-        PropertiesManager.loadUserPreferences();
-        PropertiesManager.loadColumnPermissions();
-        PropertiesManager.loadColumnDropdowns();
         try {
-            new MainWindow();
+            PropertiesManager.loadUserPreferences();
+            PropertiesManager.loadColumnPermissions();
+            PropertiesManager.loadColumnDropdowns();
+
+            SwingUtilities.invokeLater(()->{
+                new MainWindow();
+            });
         }catch (Exception e){
             e.printStackTrace();
             JOptionPane.showMessageDialog(null, "A critical error has occured.\n" +

@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Properties;
 
 public class PropertiesManager {
-    public static final String APP_DATA_DIR = getAppDirectory() + File.separator + "config";
+    public static final String APP_DATA_DIR = System.getProperty("user.home") + File.separator + ".CYR_Job_Board";
     public static final String VISIBILITY_PROPERTIES_FILE_PATH = APP_DATA_DIR + "/column-visibility.properties";
     public static final String CELL_DROPDOWN_PROPERTIES_FILE_PATH = APP_DATA_DIR + "/cell-column-dropdown.properties";
     public static final String CELL_EDITABLE_PROPERTIES_FILE_PATH = APP_DATA_DIR + "/cell-column-editable.properties";
@@ -48,17 +48,6 @@ public class PropertiesManager {
         qb.select("*");
         qb.from("column_permissions");
         resultSet = database.sendSelect(qb.build());
-    }
-
-    // set the app data directory for all property files
-    public static String getAppDirectory(){
-        try {
-            File jarFile = new File(PropertiesManager.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-            return jarFile.getParentFile().getAbsolutePath();
-        } catch (URISyntaxException e) {
-            JOptionPane.showMessageDialog(null, e.getMessage());
-            return ".";
-        }
     }
 
     // sets up the user preferences file if it didn't exist. otherwise just load from it
