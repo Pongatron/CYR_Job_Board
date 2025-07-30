@@ -7,19 +7,14 @@ import org.postgresql.PGNotification;
 
 import javax.swing.*;
 import javax.swing.border.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
-import javax.swing.event.PopupMenuEvent;
-import javax.swing.event.PopupMenuListener;
+import javax.swing.event.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.sql.*;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -40,7 +35,7 @@ public class MainWindow extends JFrame implements ActionListener {
     private static  int MAX_CELL_WIDTH = 400;
     private static  int BASE_FONT_SIZE = 15;
     private static  Dimension TOP_PANEL_PREF_SIZE = new Dimension(0, 100);
-    private static  Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(400, 70);
+    private static  Dimension BUTTON_PANEL_PREF_SIZE = new Dimension(450, 70);
     private static  Dimension TABLE_SCROLL_PREF_SIZE = new Dimension(500,0);
     private static  Font PLAIN_FONT = new Font("SansSerif", Font.PLAIN, BASE_FONT_SIZE);
     private static  Font BOLD_FONT = new Font("SansSerif", Font.BOLD, BASE_FONT_SIZE);
@@ -50,20 +45,24 @@ public class MainWindow extends JFrame implements ActionListener {
     int zoomedDateCellWidth = (int)(30 * currentZoom);
     int zoomedCellBuffer = (int)(8 * currentZoom);
 
+    private Filter jwoFilter = new Filter("jwo", ASC);
+    private Filter customerFilter = new Filter("customer", ASC);
+    private Filter dueDateFilter = new Filter("due_date", ASC);
+    private Filter currentFilter = dueDateFilter;
+
     public JobBoardMode currentBoardMode = JobBoardMode.ACTIVE_JOBS;
     private final DatabaseInteraction database;
     private ResultSet jobBoardResultSet;
-    private ResultSet customerListResultSet;
     private JPanel leftPanel;
     private JPanel topContainerPanel;
     private JPanel buttonPanel;
     private JPanel topTablePanel;
     private JPanel centerPanel;
     private JPanel datesPanel;
-    private JPanel emptyPanel;
+    private JPanel aboveDataPanel;
     private JButton addJobButton;
     private JButton updateJobButton;
-    private JButton deleteButton;
+    private JButton hideJobButton;
     private JButton jwoFilterButton;
     private JButton customerFilterButton;
     private JButton dateFilterButton;
@@ -91,7 +90,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
     public MainWindow() {
         database = new DatabaseInteraction();
-        refreshResultSets("due_date");
+        refreshResultSets();
         initializeComponents();
         syncScrollPanes();
         loadTable();
@@ -110,7 +109,7 @@ public class MainWindow extends JFrame implements ActionListener {
                     if(notifications != null){
                         for(PGNotification notification : notifications){
                             SwingUtilities.invokeLater(()->{
-                                refreshData("due_date");
+                                refreshData();
                             });
 
                         }
@@ -130,7 +129,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
         buttonPanel.add(addJobButton);
         buttonPanel.add(updateJobButton);
-        buttonPanel.add(deleteButton);
+        buttonPanel.add(hideJobButton);
         buttonPanel.add(jwoFilterButton);
         buttonPanel.add(customerFilterButton);
         buttonPanel.add(dateFilterButton);
@@ -144,7 +143,7 @@ public class MainWindow extends JFrame implements ActionListener {
         topContainerPanel.add(zoomLabel);
         topContainerPanel.add(plusZoomButton);
 
-        leftPanel.add(emptyPanel, BorderLayout.NORTH);
+        leftPanel.add(aboveDataPanel, BorderLayout.NORTH);
         leftPanel.add(tableScroll, BorderLayout.CENTER);
         setDividerLocation();
 
@@ -172,6 +171,7 @@ public class MainWindow extends JFrame implements ActionListener {
         this.setMinimumSize(new Dimension(800, 100));
         this.setBackground(new Color(24,24,24));
         this.pack();
+        this.setExtendedState(JFrame.MAXIMIZED_BOTH);
         this.setLocationRelativeTo(null);
         this.setVisible(true);
     }
@@ -191,9 +191,9 @@ public class MainWindow extends JFrame implements ActionListener {
         datesTable.setDefaultEditor(Object.class, null);
         datesTable.getTableHeader().setReorderingAllowed(false);
         datesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        datesTable.setRowSelectionAllowed(false);
-        datesTable.setColumnSelectionAllowed(false);
-        datesTable.setCellSelectionEnabled(false);
+//        datesTable.setRowSelectionAllowed(false);
+//        datesTable.setColumnSelectionAllowed(false);
+//        datesTable.setCellSelectionEnabled(false);
         datesTable.setBackground(new Color(24,24,24));
 
         timeOffTable = new JTable();
@@ -231,30 +231,30 @@ public class MainWindow extends JFrame implements ActionListener {
         datesPanel.setLayout(new BorderLayout());
         datesPanel.setBackground(new Color(24,24,24));
 
-        emptyPanel = new JPanel();
-        emptyPanel.setPreferredSize(timeOffTable.getPreferredSize());
-        emptyPanel.setBackground(new Color(24,24,24));
+        aboveDataPanel = new JPanel();
+        aboveDataPanel.setPreferredSize(timeOffTable.getPreferredSize());
+        aboveDataPanel.setBackground(new Color(24,24,24));
 
         addJobButton = new JButton("Add Job");
-        addJobButton.setBackground(new Color(220, 46, 35));
+        addJobButton.setBackground(new Color(200, 40, 40));
         addJobButton.setForeground(new Color(0,0,0));
         addJobButton.setFont(BUTTON_FONT);
         addJobButton.setFocusable(false);
         addJobButton.addActionListener(this);
 
         updateJobButton = new JButton("Update");
-        updateJobButton.setBackground(new Color(0, 52, 191));
+        updateJobButton.setBackground(new Color(0, 50, 180));
         updateJobButton.setForeground(new Color(255,255,255));
         updateJobButton.setFont(BUTTON_FONT);
         updateJobButton.setFocusable(false);
         updateJobButton.addActionListener(this);
 
-        deleteButton = new JButton("Delete");
-        deleteButton.setBackground(new Color(240, 232, 5));
-        deleteButton.setForeground(new Color(0,0,0));
-        deleteButton.setFont(BUTTON_FONT);
-        deleteButton.setFocusable(false);
-        deleteButton.addActionListener(this);
+        hideJobButton = new JButton("Hide/Unhide");
+        hideJobButton.setBackground(new Color(240, 232, 5));
+        hideJobButton.setForeground(new Color(0,0,0));
+        hideJobButton.setFont(BUTTON_FONT);
+        hideJobButton.setFocusable(false);
+        hideJobButton.addActionListener(this);
 
         jwoFilterButton = new JButton("JWO");
         jwoFilterButton.setBackground(new Color(44, 123, 201));
@@ -370,6 +370,36 @@ public class MainWindow extends JFrame implements ActionListener {
                 }
             }
         });
+
+        dataTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+            @Override
+            public void valueChanged(ListSelectionEvent e) {
+                if(!e.getValueIsAdjusting()){
+                    int selectedRow = dataTable.getSelectedRow();
+                    if(selectedRow == -1){
+                        datesTable.clearSelection();
+                    }
+                    else{
+                        datesTable.setRowSelectionInterval(0, selectedRow);
+                    }
+                }
+            }
+        });
+        datesTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+            @Override
+            public void valueChanged(ListSelectionEvent e) {
+                if(!e.getValueIsAdjusting()){
+                    int selectedRow = datesTable.getSelectedRow();
+                    if(selectedRow == -1){
+                        dataTable.clearSelection();
+                    }
+                    else{
+                        dataTable.setRowSelectionInterval(0, selectedRow);
+                    }
+                }
+            }
+        });
+
     }
 
     public void loadTable() {
@@ -380,14 +410,42 @@ public class MainWindow extends JFrame implements ActionListener {
         populateDatesTable();
         populateTimeOffTable();
         applyZoom();
+        if(currentBoardMode == JobBoardMode.ACTIVE_JOBS){
+            resetBoardButton.setForeground(new Color(0, 230, 60));
+            archiveButton.setForeground(new Color(255,255,255));
+        }
+        else{
+            archiveButton.setForeground(new Color(0, 230, 60));
+            resetBoardButton.setForeground(new Color(255,255,255));
+        }
+
+        switch (currentFilter.getFilterName()){
+            case "jwo":
+                jwoFilterButton.setForeground(new Color(0, 250, 100));
+                customerFilterButton.setForeground(new Color(255,255,255));
+                dateFilterButton.setForeground(new Color(255,255,255));
+                break;
+            case "customer":
+                jwoFilterButton.setForeground(new Color(255,255,255));
+                customerFilterButton.setForeground(new Color(0, 250, 100));
+                dateFilterButton.setForeground(new Color(255,255,255));
+                break;
+            case "due_date":
+                jwoFilterButton.setForeground(new Color(255,255,255));
+                customerFilterButton.setForeground(new Color(255,255,255));
+                dateFilterButton.setForeground(new Color(0, 250, 100));
+                break;
+            default:
+
+        }
     }
 
-    public void refreshData(String filter){
-        refreshResultSets(filter);
+    public void refreshData(){
+        refreshResultSets();
         loadTable();
     }
 
-    public void refreshResultSets(String filter){
+    public void refreshResultSets(){
         String isActiveValue = "true";
         if(currentBoardMode == JobBoardMode.ARCHIVE){
             isActiveValue = "false";
@@ -397,14 +455,9 @@ public class MainWindow extends JFrame implements ActionListener {
         qbJobBoard.select("*");
         qbJobBoard.from("job_board");
         qbJobBoard.where("is_active = "+isActiveValue);
-        qbJobBoard.orderBy(new Filter(filter, ASC));
-        qbJobBoard.orderBy(new Filter("jwo", ASC));
+        qbJobBoard.orderBy(currentFilter);
+        qbJobBoard.orderBy(jwoFilter);
         jobBoardResultSet = database.sendSelect(qbJobBoard.build());
-
-        SelectQueryBuilder qbCustomerList = new SelectQueryBuilder();
-        qbCustomerList.select("*");
-        qbCustomerList.from("customer_list");
-        customerListResultSet = database.sendSelect(qbCustomerList.build());
     }
 
     public void createDataTable(){
@@ -626,7 +679,7 @@ public class MainWindow extends JFrame implements ActionListener {
         dataTable.setRowHeight(rowHeight);
         datesTable.setRowHeight(rowHeight);
         timeOffTable.setRowHeight(zoomedDateCellWidth * 2);
-        emptyPanel.setPreferredSize(timeOffTable.getPreferredSize());
+        aboveDataPanel.setPreferredSize(timeOffTable.getPreferredSize());
     }
 
     public void applyZoom(){
@@ -648,7 +701,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
         addJobButton.setFont(BUTTON_FONT);
         updateJobButton.setFont(BUTTON_FONT);
-        deleteButton.setFont(BUTTON_FONT);
+        hideJobButton.setFont(BUTTON_FONT);
         jwoFilterButton.setFont(BUTTON_FONT);
         customerFilterButton.setFont(BUTTON_FONT);
         dateFilterButton.setFont(BUTTON_FONT);
@@ -907,13 +960,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
         if(currentBoardMode == JobBoardMode.ARCHIVE){
             dataTable.setDefaultEditor(Object.class, null);
-            dataTable.setRowSelectionAllowed(false);
-            dataTable.setColumnSelectionAllowed(false);
-            dataTable.setCellSelectionEnabled(false);
             return;
-        }
-        else{
-            dataTable.setRowSelectionAllowed(true);
         }
 
         try {
@@ -947,7 +994,6 @@ public class MainWindow extends JFrame implements ActionListener {
                     comboBox.setBackground(new Color(60, 60, 60));
                     comboBox.setForeground(Color.WHITE);
                     comboBox.setFont(PLAIN_FONT);
-                    comboBox.setBorder(new EmptyBorder(5, 5, 5, 5));
                     comboBox.setMaximumRowCount(10);
 
                     if ("t".equals(isEditableValue)) {
@@ -1109,7 +1155,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
     private AddJobWindow addJobWindow = null;
     private UpdateJobWindow updateJobWindow = null;
-    private DeleteJobWindow deleteJobWindow = null;
+    private HideJobWindow hideJobWindow = null;
     private AddTimeOffWindow addTimeOffWindow = null;
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -1119,7 +1165,7 @@ public class MainWindow extends JFrame implements ActionListener {
                 addJobWindow.addWindowListener(new WindowAdapter() {
                     @Override
                     public void windowClosed(WindowEvent e) {
-                        updateJobWindow = null;
+                        addJobWindow = null;
                     }
                 });
             }
@@ -1145,43 +1191,46 @@ public class MainWindow extends JFrame implements ActionListener {
                 updateJobWindow.toFront();
             }
         }
-        if(e.getSource() == deleteButton){
-            if(deleteJobWindow == null || !deleteJobWindow.isDisplayable()) {
+        if(e.getSource() == hideJobButton){
+            if(hideJobWindow == null || !hideJobWindow.isDisplayable()) {
                 int selectedRow = dataTable.getSelectedRow();
-                if(selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
+                if(selectedRow != -1) {
                     String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
-                    deleteJobWindow = new DeleteJobWindow(selectedJwo);
-                    deleteJobWindow.addWindowListener(new WindowAdapter() {
+                    hideJobWindow = new HideJobWindow(selectedJwo, currentBoardMode);
+                    hideJobWindow.addWindowListener(new WindowAdapter() {
                         @Override
                         public void windowClosed(WindowEvent e) {
-                            deleteJobWindow = null;
+                            hideJobWindow = null;
                         }
                     });
                 }
             }
             else {
-                deleteJobWindow.toFront();
+                hideJobWindow.toFront();
             }
         }
         if(e.getSource() == jwoFilterButton){
-            refreshData("jwo");
+            currentFilter = jwoFilter;
+            refreshData();
         }
         if(e.getSource() == customerFilterButton){
-            refreshData("customer");
+            currentFilter = customerFilter;
+            refreshData();
         }
         if(e.getSource() == dateFilterButton){
-            refreshData("due_date");
+            currentFilter = dueDateFilter;
+            refreshData();
         }
         if(e.getSource() == todayButton) {
             resetDatesScrollBar();
         }
         if(e.getSource() == resetBoardButton) {
             currentBoardMode = JobBoardMode.ACTIVE_JOBS;
-            refreshData("due_date");
+            refreshData();
         }
         if(e.getSource() == archiveButton) {
             currentBoardMode = JobBoardMode.ARCHIVE;
-            refreshData("due_date");
+            refreshData();
         }
 
         if(e.getSource() == timeOffButton){

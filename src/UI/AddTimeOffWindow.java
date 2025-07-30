@@ -51,7 +51,7 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
         this.add(centerPanel);
 
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        this.setTitle("Add Job");
+        this.setTitle("Add Time Off");
         this.setBackground(new Color(24,24,24));
         this.setResizable(false);
         this.pack();
@@ -96,6 +96,15 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
         cancelButton.addActionListener(this);
 
         fields = new ArrayList<>();
+
+        JRootPane rootPane = this.getRootPane();
+        rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("ENTER"), "confirm");
+        rootPane.getActionMap().put("confirm", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                createButton.doClick(); // simulate button press
+            }
+        });
     }
 
     private void addFields() {
@@ -145,7 +154,7 @@ public class AddTimeOffWindow extends JFrame implements ActionListener {
                     comboBox.setBackground(new Color(60, 60, 60));
                     comboBox.setForeground(Color.WHITE);
                     comboBox.setFont(new Font("SansSerif", Font.PLAIN, 20));
-                    comboBox.setBorder(new EmptyBorder(5, 5, 5, 5));
+                    comboBox.setBorder(new EmptyBorder(0, 5, 0, 0));
                     comboBox.setMaximumRowCount(5);
 
                     text = comboBox;

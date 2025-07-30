@@ -11,32 +11,36 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.sql.SQLException;
 
-public class DeleteJobWindow extends JFrame implements ActionListener {
+public class HideJobWindow extends JFrame implements ActionListener {
 
+    private MainWindow.JobBoardMode currentBoardMode;
     private static  Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 15);
-    private static final String DELETE_PASSWORD = "password";
+    private static final String HIDE_PASSWORD = "1991wood";
     private DatabaseInteraction database;
     private JPanel topPanel;
     private JPanel centerPanel;
     private JPanel fieldsPanel;
     private JPanel buttonsPanel;
-    private JButton deleteJobButton;
+    private JButton confirmButton;
     private JButton cancelButton;
     private String selectedJwo;
     private JTextField passwordText;
     private JLabel wrongPasswordLabel;
+    private JComboBox comboBox;
 
-    public DeleteJobWindow(String jwo){
+    public HideJobWindow(String jwo, MainWindow.JobBoardMode currentBoardMode){
         database = new DatabaseInteraction();
         selectedJwo = jwo;
+        this.currentBoardMode = currentBoardMode;
         initializeComponents();
 
-        JLabel headingText = new JLabel("Delete Job", SwingConstants.CENTER);
+        JLabel headingText = new JLabel("Hide / Unhide Job", SwingConstants.CENTER);
+
         headingText.setForeground(new Color(200,40,40));
         headingText.setFont(new Font(headingText.getFont().getFontName(), Font.BOLD, 30));
         topPanel.add(headingText);
 
-        buttonsPanel.add(deleteJobButton);
+        buttonsPanel.add(confirmButton);
         buttonsPanel.add(cancelButton);
 
         populateFieldsPanel();
@@ -51,7 +55,7 @@ public class DeleteJobWindow extends JFrame implements ActionListener {
 
 
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        this.setTitle("Add Job");
+        this.setTitle("Hide/Unhide Job");
         this.setBackground(new Color(24,24,24));
         this.setResizable(false);
         this.pack();
@@ -79,13 +83,13 @@ public class DeleteJobWindow extends JFrame implements ActionListener {
         buttonsPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 10));
         buttonsPanel.setBackground(new Color(40,40,40));
 
-        deleteJobButton = new JButton("Delete");
-        deleteJobButton.setPreferredSize(new Dimension(100,40));
-        deleteJobButton.setBackground(new Color(0, 0, 0));
-        deleteJobButton.setForeground(new Color(255,255,255));
-        deleteJobButton.setFont(BUTTON_FONT);
-        deleteJobButton.setFocusable(false);
-        deleteJobButton.addActionListener(this);
+        confirmButton = new JButton("Confirm");
+        confirmButton.setPreferredSize(new Dimension(100,40));
+        confirmButton.setBackground(new Color(0, 0, 0));
+        confirmButton.setForeground(new Color(255,255,255));
+        confirmButton.setFont(BUTTON_FONT);
+        confirmButton.setFocusable(false);
+        confirmButton.addActionListener(this);
 
         cancelButton = new JButton("Cancel");
         cancelButton.setPreferredSize(new Dimension(100,40));
@@ -95,11 +99,21 @@ public class DeleteJobWindow extends JFrame implements ActionListener {
         cancelButton.setFocusable(false);
         cancelButton.addActionListener(this);
 
+        JRootPane rootPane = this.getRootPane();
+        rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("ENTER"), "confirm");
+        rootPane.getActionMap().put("confirm", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                confirmButton.doClick(); // simulate button press
+            }
+        });
+
     }
 
     public void populateFieldsPanel(){
+        String hideModeText = currentBoardMode == MainWindow.JobBoardMode.ACTIVE_JOBS ? "Hide" : "Unhide";
 
-        JLabel confirmationLabel = new JLabel("Are you sure you want to delete this job?");
+        JLabel confirmationLabel = new JLabel("<html><div style='text-align: center;'>Set job as Active or Archived<br>('t' is active, 'f' is archived)</div></html>");
         confirmationLabel.setForeground(Color.white);
         confirmationLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
         confirmationLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -109,7 +123,29 @@ public class DeleteJobWindow extends JFrame implements ActionListener {
         jwoLabel.setBackground(new Color(140,100,0));
         jwoLabel.setOpaque(true);
         jwoLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
+        jwoLabel.setBorder(new EmptyBorder(0,0,0,0));
         jwoLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JLabel isActiveLabel = new JLabel("Active? :");
+        isActiveLabel.setForeground(Color.white);
+        isActiveLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
+        isActiveLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        String[] options = new String[]{"t", "f"};
+        if(currentBoardMode == MainWindow.JobBoardMode.ARCHIVE){options = new String[]{"f", "t"};}
+        comboBox = new JComboBox<>(options);
+        comboBox.setPreferredSize(new Dimension(200, 30));
+        comboBox.setEditable(false);
+        comboBox.setBackground(new Color(60, 60, 60));
+        comboBox.setForeground(Color.WHITE);
+        comboBox.setFont(new Font("SansSerif", Font.PLAIN, 20));
+        comboBox.setBorder(new EmptyBorder(0, 5, 0, 0));
+        comboBox.setMaximumRowCount(2);
+
+        JPanel isActivePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+        isActivePanel.setBackground(new Color(40, 40, 40));
+        isActivePanel.add(isActiveLabel);
+        isActivePanel.add(comboBox);
 
         JLabel passwordLabel = new JLabel("Password: ");
         passwordLabel.setForeground(Color.white);
@@ -148,6 +184,7 @@ public class DeleteJobWindow extends JFrame implements ActionListener {
 
         fieldsPanel.add(confirmationLabel);
         fieldsPanel.add(jwoLabel);
+        fieldsPanel.add(isActivePanel);
         fieldsPanel.add(passwordPanel);
         fieldsPanel.add(wrongPasswordLabel);
     }
@@ -155,20 +192,24 @@ public class DeleteJobWindow extends JFrame implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
 
-        if(e.getSource() == deleteJobButton){
-            if(!passwordText.getText().toString().equals(DELETE_PASSWORD)){
+        if(e.getSource() == confirmButton){
+            String selectedItem = comboBox.getSelectedItem().toString();
+            if(!passwordText.getText().toString().equals(HIDE_PASSWORD)){
                 wrongPasswordLabel.setVisible(true);
+            }
+            else if(selectedItem.equals("t") && currentBoardMode == MainWindow.JobBoardMode.ACTIVE_JOBS ||
+                    selectedItem.equals("f") && currentBoardMode == MainWindow.JobBoardMode.ARCHIVE){
+                JOptionPane.showMessageDialog(this, "Job Active status is unchanged. Set status or cancel");
             }
             else{
                 UpdateQueryBuilder qb = new UpdateQueryBuilder();
                 qb.updateTable("job_board");
                 qb.setColNames("is_active");
-                qb.setValues("false");
+                qb.setValues(selectedItem);
                 qb.where("jwo = " + selectedJwo);
-                qb.where("is_active = true");
                 try {
                     database.sendUpdate(qb.build());
-                    JOptionPane.showMessageDialog(this, "Job sent to Archive");
+                    JOptionPane.showMessageDialog(this, "JWO: "+ selectedJwo +" Active status changed to: "+selectedItem);
                 } catch (SQLException ex) {
                     JOptionPane.showMessageDialog(null, ex.getMessage());
                 }
