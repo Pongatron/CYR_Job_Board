@@ -24,7 +24,6 @@ public class TimeOffCustomCellRenderer extends DefaultTableCellRenderer {
     private static Border cellBorder = new EmptyBorder((int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()),(int)(10* ZoomManager.getZoom()));
 
     private int colIndex = -1;
-    private ArrayList<TimeOffDates> dates;
 
     public TimeOffCustomCellRenderer(HoverIndex hoverRow){
         this.hoverRow = hoverRow;
@@ -94,7 +93,4 @@ public class TimeOffCustomCellRenderer extends DefaultTableCellRenderer {
         g2.dispose();
     }
 
-    public void setTimeOffDates(ArrayList<TimeOffDates> dates){
-        this.dates = dates;
-    }
 }

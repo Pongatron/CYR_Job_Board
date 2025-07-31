@@ -90,8 +90,4 @@ public class TableCustom {
         DateTableCustomCellRenderer renderer = (DateTableCustomCellRenderer) table.getDefaultRenderer(Object.class);
         renderer.setDates(dates);
     }
-    public static void applyTimeOffDates(JTable table, ArrayList<TimeOffDates> dates){
-        TimeOffCustomCellRenderer renderer = (TimeOffCustomCellRenderer) table.getDefaultRenderer(Object.class);
-        renderer.setTimeOffDates(dates);
-    }
 }
