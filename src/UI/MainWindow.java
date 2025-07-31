@@ -1202,14 +1202,12 @@ public class MainWindow extends JFrame implements ActionListener {
         setTimeOffComboBox();
         timeOffTable.addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseClicked(MouseEvent e) {
+            public void mousePressed(MouseEvent e) {
                 int col = timeOffTable.columnAtPoint(e.getPoint());
                 String worker = (String)timeOffComboBox.getSelectedItem();
-                System.out.println(worker);
                 if(worker.isBlank())
                     return;
                 String date = timeOffTable.getColumnModel().getColumn(col).getHeaderValue().toString();
-                System.out.println(date);
                 TimeOffValue clickedValue = null;
 
                 for(TimeOffValue v : timeOffValues){
@@ -1244,7 +1242,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
     private AddJobWindow addJobWindow = null;
     private UpdateJobWindow updateJobWindow = null;
-    private HideJobWindow hideJobWindow = null;
+    private ArchiveJobWindow archiveJobWindow = null;
     private EditDropdownsWindow editDropdownsWindow = null;
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -1281,21 +1279,21 @@ public class MainWindow extends JFrame implements ActionListener {
             }
         }
         if(e.getSource() == addToArchiveButton){
-            if(hideJobWindow == null || !hideJobWindow.isDisplayable()) {
+            if(archiveJobWindow == null || !archiveJobWindow.isDisplayable()) {
                 int selectedRow = dataTable.getSelectedRow();
                 if(selectedRow != -1) {
                     String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
-                    hideJobWindow = new HideJobWindow(this, selectedJwo, currentBoardMode);
-                    hideJobWindow.addWindowListener(new WindowAdapter() {
+                    archiveJobWindow = new ArchiveJobWindow(this, selectedJwo, currentBoardMode);
+                    archiveJobWindow.addWindowListener(new WindowAdapter() {
                         @Override
                         public void windowClosed(WindowEvent e) {
-                            hideJobWindow = null;
+                            archiveJobWindow = null;
                         }
                     });
                 }
             }
             else {
-                hideJobWindow.toFront();
+                archiveJobWindow.toFront();
             }
         }
         if(e.getSource() == jwoFilterButton){

@@ -11,7 +11,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.sql.SQLException;
 
-public class HideJobWindow extends JFrame implements ActionListener {
+public class ArchiveJobWindow extends JFrame implements ActionListener {
 
     private MainWindow.JobBoardMode currentBoardMode;
     private static  Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 15);
@@ -28,7 +28,7 @@ public class HideJobWindow extends JFrame implements ActionListener {
     private JLabel wrongPasswordLabel;
     private JComboBox comboBox;
 
-    public HideJobWindow(JFrame owner, String jwo, MainWindow.JobBoardMode currentBoardMode){
+    public ArchiveJobWindow(JFrame owner, String jwo, MainWindow.JobBoardMode currentBoardMode){
         database = new DatabaseInteraction();
         selectedJwo = jwo;
         this.currentBoardMode = currentBoardMode;
@@ -117,7 +117,6 @@ public class HideJobWindow extends JFrame implements ActionListener {
     }
 
     public void populateFieldsPanel(){
-        String hideModeText = currentBoardMode == MainWindow.JobBoardMode.ACTIVE_JOBS ? "Hide" : "Unhide";
 
         JLabel confirmationLabel = new JLabel("<html><div style='text-align: center;'>Set job as Active or Archived<br>('t' is active, 'f' is archived)</div></html>");
         confirmationLabel.setForeground(Color.white);
@@ -191,8 +190,10 @@ public class HideJobWindow extends JFrame implements ActionListener {
         fieldsPanel.add(confirmationLabel);
         fieldsPanel.add(jwoLabel);
         fieldsPanel.add(isActivePanel);
-        fieldsPanel.add(passwordPanel);
-        fieldsPanel.add(wrongPasswordLabel);
+        if(currentBoardMode == MainWindow.JobBoardMode.ARCHIVE) {
+            fieldsPanel.add(passwordPanel);
+            fieldsPanel.add(wrongPasswordLabel);
+        }
     }
 
     @Override
@@ -201,12 +202,12 @@ public class HideJobWindow extends JFrame implements ActionListener {
         if(e.getSource() == confirmButton){
             String selectedItem = comboBox.getSelectedItem().toString();
             String enteredPassword = new String(passwordText.getPassword());
-            if(!enteredPassword.equals(HIDE_PASSWORD)){
+            if(currentBoardMode == MainWindow.JobBoardMode.ARCHIVE && !enteredPassword.equals(HIDE_PASSWORD)){
                 wrongPasswordLabel.setVisible(true);
             }
             else if(selectedItem.equals("t") && currentBoardMode == MainWindow.JobBoardMode.ACTIVE_JOBS ||
                     selectedItem.equals("f") && currentBoardMode == MainWindow.JobBoardMode.ARCHIVE){
-                JOptionPane.showMessageDialog(this, "Job Active status is unchanged. Set status or cancel");
+                JOptionPane.showMessageDialog(this, "Job Active status is unchanged. Set status or cancel", null, JOptionPane.ERROR_MESSAGE);
             }
             else{
                 UpdateQueryBuilder qb = new UpdateQueryBuilder();
