@@ -1,5 +1,6 @@
 package Table;
 
+import UI.MainWindow;
 import UI.ZoomManager;
 
 import javax.swing.*;
@@ -12,6 +13,7 @@ import java.sql.Time;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 
 public class TimeOffCustomCellRenderer extends DefaultTableCellRenderer {
 
@@ -50,26 +52,29 @@ public class TimeOffCustomCellRenderer extends DefaultTableCellRenderer {
         }
         label.setForeground(Color.white);
 
-        if(dates != null) {
-            String allPeople = "";
-            for(int i = 0; i < dates.size(); i++) {
-                TimeOffDates dateRange = dates.get(i);
-                DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("E- dd- MMM");
+        Color oldColor = label.getBackground();
+        ArrayList<String> people = new ArrayList<>();
 
-                if(!allPeople.contains(dateRange.getPerson())) {
-                    for (LocalDate date : dateRange.getOffDays()) {
-                        String dateString = date.format(dateFormat);
-                        if (dateString.equals(table.getColumnName(column))) {
-
-                            allPeople += dateRange.getPerson() + " ";
-                            String wrappedText = "<html><center style='text-align: left'>" + allPeople.replace(" ", "<br>") + "</center></html>";
-
-                            label.setText(wrappedText);
-                            label.setBackground(new Color(24, 80, 24));
-                        }
-                    }
-                }
+        String allPeople = "";
+        for(TimeOffValue tov : MainWindow.timeOffValues){
+            if(tov.getCol() == column){
+                people.add(tov.getWorker());
             }
+        }
+        Collections.sort(people, String.CASE_INSENSITIVE_ORDER);
+
+        if(!people.isEmpty()) {
+            StringBuilder sb = new StringBuilder("<html><center style='text-align: left'>");
+            for(String p : people){
+                sb.append(p).append("<br>");
+            }
+            sb.append("</center></html>");
+            label.setText(sb.toString());
+            label.setBackground(new Color(24, 80, 24));
+        }
+        else{
+            label.setText("");
+            label.setBackground(oldColor);
         }
         return label;
     }

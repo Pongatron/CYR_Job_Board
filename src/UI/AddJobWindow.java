@@ -29,8 +29,8 @@ public class AddJobWindow extends JFrame implements ActionListener {
     private JButton cancelButton;
     private ArrayList<String> requiredCols;
 
-    public AddJobWindow(DatabaseInteraction db, ResultSet rs){
-        database = db;
+    public AddJobWindow(JFrame owner,  ResultSet rs){
+        database = new DatabaseInteraction();
         jobBoardResultSet = rs;
         initializeComponents();
         addFields();
@@ -56,7 +56,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
         this.setBackground(new Color(24,24,24));
         this.setResizable(false);
         this.pack();
-        this.setLocationRelativeTo(null);
+        this.setLocationRelativeTo(owner);
         this.setVisible(true);
     }
 
@@ -200,7 +200,6 @@ public class AddJobWindow extends JFrame implements ActionListener {
                 fieldsPanel.add(panel);
             }
         }
-        database.closeResources();
     }
 
 
@@ -245,6 +244,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
             if(notEmpty) {
                 try {
                     database.sendUpdate(qb.build());
+                    database.closeResources();
                     dispose();
                 } catch (SQLException ex) {
                     String msg = ex.getMessage();
@@ -260,8 +260,6 @@ public class AddJobWindow extends JFrame implements ActionListener {
                     }
 
                     JOptionPane.showMessageDialog(this, msg, null, JOptionPane.ERROR_MESSAGE);
-                }finally {
-                    database.closeResources();
                 }
             }
             else{

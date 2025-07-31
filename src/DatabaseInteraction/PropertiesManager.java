@@ -71,6 +71,7 @@ public class PropertiesManager {
                 props.store(output, "User Preferences");
             }catch (IOException e){
                 JOptionPane.showMessageDialog(null, e.getMessage());
+                Exceptions.ErrorWriting.logError(e);
                 System.exit(1);
             }
         }
@@ -111,12 +112,13 @@ public class PropertiesManager {
                     props.store(output, "User Preferences");
                 } catch (IOException e) {
                     JOptionPane.showMessageDialog(null, e.getMessage());
+                    Exceptions.ErrorWriting.logError(e);
                     System.exit(1);
                 }
             }
             else{
                 JOptionPane.showMessageDialog(null, "Unsuccessful");
-                System.exit(1);
+                System.exit(0);
             }
         }
         else{
@@ -132,8 +134,10 @@ public class PropertiesManager {
                 props.setProperty("database.url.set", "f");
                 props.store(output, "User Preferences");
             } catch (IOException ex) {
+                Exceptions.ErrorWriting.logError(e);
                 System.exit(1);
             }
+            Exceptions.ErrorWriting.logError(e);
             System.exit(1);
         }
     }
@@ -192,7 +196,8 @@ public class PropertiesManager {
                     f.createNewFile();
                 } catch (IOException e) {
                     JOptionPane.showMessageDialog(null, e.getMessage());
-                    System.exit(0);
+                    Exceptions.ErrorWriting.logError(e);
+                    System.exit(1);
                 }
             }
 
@@ -239,7 +244,8 @@ public class PropertiesManager {
                 f.createNewFile();
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(null, e.getMessage());
-                System.exit(0);
+                Exceptions.ErrorWriting.logError(e);
+                System.exit(1);
             }
         }
 
@@ -269,6 +275,7 @@ public class PropertiesManager {
                 SelectQueryBuilder qb = new SelectQueryBuilder();
                 qb.select("*");
                 qb.from(tableName);
+                qb.orderBy(new Filter(tableName, Filter.FilterStatus.ASC));
                 ResultSet rs = database.sendSelect(qb.build());
 
                 String dropdownOptions = "";

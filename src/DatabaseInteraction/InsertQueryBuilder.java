@@ -30,31 +30,51 @@ public class InsertQueryBuilder {
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT INTO ");
         sb.append(table);
-        sb.append("(");
-        for(int i = 0; i < columns.size(); i++){
-            sb.append(columns.get(i));
-            if (i < columns.size() - 1) {
-                sb.append(", ");
+
+        if(!columns.isEmpty()) {
+            sb.append("(");
+            for (int i = 0; i < columns.size(); i++) {
+                sb.append(columns.get(i));
+                if (i < columns.size() - 1) {
+                    sb.append(", ");
+                }
+            }
+            sb.append(")");
+
+
+            sb.append(" VALUES (");
+            for (int i = 0; i < values.size(); i++) {
+                if (!values.get(i).isBlank()) {
+                    sb.append("'");
+                    sb.append(values.get(i));
+                    sb.append("'");
+                } else {
+                    sb.append("null");
+                }
+
+                if (i < values.size() - 1) {
+                    sb.append(", ");
+                }
+            }
+            sb.append(")");
+        }
+        else{
+            sb.append(" VALUES ");
+            for (int i = 0; i < values.size(); i++) {
+                if (!values.get(i).isBlank()) {
+                    sb.append("('");
+                    sb.append(values.get(i));
+                    sb.append("')");
+                } else {
+                    sb.append("(null)");
+                }
+
+                if (i < values.size() - 1) {
+                    sb.append(", ");
+                }
             }
         }
-        sb.append(")");
-
-        sb.append(" VALUES (");
-        for(int i = 0; i < values.size(); i++){
-            if(!values.get(i).isBlank()){
-                sb.append("'");
-                sb.append(values.get(i));
-                sb.append("'");
-            }
-            else{
-                sb.append("null");
-            }
-
-            if (i < values.size() - 1) {
-                sb.append(", ");
-            }
-        }
-        sb.append(");");
+        sb.append(";");
         return sb.toString();
     }
 

@@ -24,19 +24,25 @@ public class HideJobWindow extends JFrame implements ActionListener {
     private JButton confirmButton;
     private JButton cancelButton;
     private String selectedJwo;
-    private JTextField passwordText;
+    private JPasswordField passwordText;
     private JLabel wrongPasswordLabel;
     private JComboBox comboBox;
 
-    public HideJobWindow(String jwo, MainWindow.JobBoardMode currentBoardMode){
+    public HideJobWindow(JFrame owner, String jwo, MainWindow.JobBoardMode currentBoardMode){
         database = new DatabaseInteraction();
         selectedJwo = jwo;
         this.currentBoardMode = currentBoardMode;
         initializeComponents();
 
-        JLabel headingText = new JLabel("Hide / Unhide Job", SwingConstants.CENTER);
+        JLabel headingText = new JLabel("", SwingConstants.CENTER);
+        if(currentBoardMode == MainWindow.JobBoardMode.ACTIVE_JOBS){
+            headingText.setText("Archive Job");
+        }
+        else{
+            headingText.setText("Un-Archive Job");
+        }
 
-        headingText.setForeground(new Color(200,40,40));
+        headingText.setForeground(new Color(140,100,0));
         headingText.setFont(new Font(headingText.getFont().getFontName(), Font.BOLD, 30));
         topPanel.add(headingText);
 
@@ -55,11 +61,11 @@ public class HideJobWindow extends JFrame implements ActionListener {
 
 
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        this.setTitle("Hide/Unhide Job");
+        this.setTitle("Archive/Un-Archive Job");
         this.setBackground(new Color(24,24,24));
         this.setResizable(false);
         this.pack();
-        this.setLocationRelativeTo(null);
+        this.setLocationRelativeTo(owner);
         this.setVisible(true);
     }
 
@@ -151,7 +157,7 @@ public class HideJobWindow extends JFrame implements ActionListener {
         passwordLabel.setForeground(Color.white);
         passwordLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
 
-        passwordText = new JTextField();
+        passwordText = new JPasswordField();
         passwordText.setPreferredSize(new Dimension(200, 30));
         passwordText.setCaretColor(Color.white);
         passwordText.setBackground(new Color(60, 60, 60));
@@ -194,7 +200,8 @@ public class HideJobWindow extends JFrame implements ActionListener {
 
         if(e.getSource() == confirmButton){
             String selectedItem = comboBox.getSelectedItem().toString();
-            if(!passwordText.getText().toString().equals(HIDE_PASSWORD)){
+            String enteredPassword = new String(passwordText.getPassword());
+            if(!enteredPassword.equals(HIDE_PASSWORD)){
                 wrongPasswordLabel.setVisible(true);
             }
             else if(selectedItem.equals("t") && currentBoardMode == MainWindow.JobBoardMode.ACTIVE_JOBS ||
@@ -210,11 +217,12 @@ public class HideJobWindow extends JFrame implements ActionListener {
                 try {
                     database.sendUpdate(qb.build());
                     JOptionPane.showMessageDialog(this, "JWO: "+ selectedJwo +" Active status changed to: "+selectedItem);
+                    dispose();
                 } catch (SQLException ex) {
                     JOptionPane.showMessageDialog(null, ex.getMessage());
-                }
+                    dispose();
 
-                dispose();
+                }
             }
         }
 

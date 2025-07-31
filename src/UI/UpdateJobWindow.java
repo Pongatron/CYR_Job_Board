@@ -38,8 +38,8 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
     private static final Color UPDATE_PANEL_COLOR = new Color(40, 40, 40);
     private DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("MM/dd/yyyy");
 
-    public UpdateJobWindow(DatabaseInteraction db, ResultSet rs, String jwo){
-        database = db;
+    public UpdateJobWindow(JFrame owner, ResultSet rs, String jwo){
+        database = new DatabaseInteraction();
         jobBoardResultSet = rs;
         selectedJwo = jwo;
         initializeComponents();
@@ -66,7 +66,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
         this.setBackground(new Color(24,24,24));
         this.setResizable(false);
         this.pack();
-        this.setLocationRelativeTo(null);
+        this.setLocationRelativeTo(owner);
         this.setVisible(true);
     }
 
@@ -157,7 +157,9 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                 }
             }
         }catch (SQLException e){
+            e.printStackTrace();
             JOptionPane.showMessageDialog(null, e.getMessage() + "\n for safety...");
+            Exceptions.ErrorWriting.logError(e);
             System.exit(1);
         }
 
@@ -230,6 +232,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                     value = jobBoardResultSet.getObject(databaseColIndex);
                 } catch (SQLException e) {
                     JOptionPane.showMessageDialog(null, e.getMessage());
+                    Exceptions.ErrorWriting.logError(e);
                     System.exit(1);
                 }
 
@@ -247,7 +250,6 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                 }
             }
         }
-        database.closeResources();
     }
 
     @Override
@@ -292,6 +294,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                 try {
                     qb.where("jwo = "+ selectedJwo);
                     database.sendUpdate(qb.build());
+                    database.closeResources();
                     dispose();
                 } catch (SQLException ex) {
                     String msg = ex.getMessage();
@@ -308,7 +311,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
 
                     JOptionPane.showMessageDialog(this, msg, null, JOptionPane.ERROR_MESSAGE);
                 }finally {
-                    database.closeResources();
+
                 }
             }
             else{

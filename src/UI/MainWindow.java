@@ -62,14 +62,14 @@ public class MainWindow extends JFrame implements ActionListener {
     private JPanel aboveDataPanel;
     private JButton addJobButton;
     private JButton updateJobButton;
-    private JButton hideJobButton;
+    private JButton addToArchiveButton;
     private JButton jwoFilterButton;
     private JButton customerFilterButton;
     private JButton dateFilterButton;
     private JButton todayButton;
-    private JButton resetBoardButton;
-    private JButton timeOffButton;
-    private JButton archiveButton;
+    private JButton activeBoardButton;
+    private JButton archiveViewButton;
+    private JButton editDropdownsButton;
     private JButton plusZoomButton;
     private JButton minusZoomButton;
     private JScrollPane tableScroll;
@@ -82,6 +82,10 @@ public class MainWindow extends JFrame implements ActionListener {
     public static int totalWidth;
     private int todayCol = -1;
     private JLabel zoomLabel;
+    private JLabel timeOffLabel;
+
+    public static ArrayList<TimeOffValue> timeOffValues;
+    private JComboBox timeOffComboBox;
 
     ArrayList<Integer> visibleIndexes = new ArrayList<>();
 
@@ -90,10 +94,13 @@ public class MainWindow extends JFrame implements ActionListener {
 
     public MainWindow() {
         database = new DatabaseInteraction();
-        refreshResultSets();
+
+        jobBoardResultSet = refreshResultSets();
         initializeComponents();
         syncScrollPanes();
         loadTable();
+        setTimeOffTableFunction();
+        populateTimeOffTable();
         resetDatesScrollBar();
 
 
@@ -108,13 +115,29 @@ public class MainWindow extends JFrame implements ActionListener {
                     PGNotification[] notifications = pgconn.getNotifications();
                     if(notifications != null){
                         for(PGNotification notification : notifications){
-                            SwingUtilities.invokeLater(()->{
-                                refreshData();
-                            });
+                            String payload = notification.getParameter();
+                            String[] parts = payload.split(":");
+                            if(parts.length == 2) {
+                                String tableName = parts[0];
+                                String operation = parts[1];
 
+                                if (tableName.contains("_list") && "INSERT".equals(operation)) {
+                                    PropertiesManager.loadColumnDropdowns();
+                                    if(tableName.equals("worker_list")){
+                                        setTimeOffComboBox();
+                                    }
+                                }
+                                else if(tableName.equals("time_off")){
+                                    populateTimeOffTable();
+                                }
+
+                                SwingUtilities.invokeLater(() -> {
+                                    refreshData();
+                                });
+                            }
                         }
                     }
-                    Thread.sleep(100);
+                    Thread.sleep(500);
                 }
 
             }catch (Exception e){
@@ -129,19 +152,22 @@ public class MainWindow extends JFrame implements ActionListener {
 
         buttonPanel.add(addJobButton);
         buttonPanel.add(updateJobButton);
-        buttonPanel.add(hideJobButton);
+        buttonPanel.add(addToArchiveButton);
         buttonPanel.add(jwoFilterButton);
         buttonPanel.add(customerFilterButton);
         buttonPanel.add(dateFilterButton);
 
         topContainerPanel.add(buttonPanel);
-        topContainerPanel.add(resetBoardButton);
-        topContainerPanel.add(archiveButton);
-        topContainerPanel.add(timeOffButton);
+        topContainerPanel.add(activeBoardButton);
+        topContainerPanel.add(archiveViewButton);
+        topContainerPanel.add(editDropdownsButton);
         topContainerPanel.add(todayButton);
         topContainerPanel.add(minusZoomButton);
         topContainerPanel.add(zoomLabel);
         topContainerPanel.add(plusZoomButton);
+
+        aboveDataPanel.add(timeOffLabel);
+        aboveDataPanel.add(timeOffComboBox);
 
         leftPanel.add(aboveDataPanel, BorderLayout.NORTH);
         leftPanel.add(tableScroll, BorderLayout.CENTER);
@@ -231,7 +257,7 @@ public class MainWindow extends JFrame implements ActionListener {
         datesPanel.setLayout(new BorderLayout());
         datesPanel.setBackground(new Color(24,24,24));
 
-        aboveDataPanel = new JPanel();
+        aboveDataPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         aboveDataPanel.setPreferredSize(timeOffTable.getPreferredSize());
         aboveDataPanel.setBackground(new Color(24,24,24));
 
@@ -249,12 +275,12 @@ public class MainWindow extends JFrame implements ActionListener {
         updateJobButton.setFocusable(false);
         updateJobButton.addActionListener(this);
 
-        hideJobButton = new JButton("Hide/Unhide");
-        hideJobButton.setBackground(new Color(240, 232, 5));
-        hideJobButton.setForeground(new Color(0,0,0));
-        hideJobButton.setFont(BUTTON_FONT);
-        hideJobButton.setFocusable(false);
-        hideJobButton.addActionListener(this);
+        addToArchiveButton = new JButton("Archive");
+        addToArchiveButton.setBackground(new Color(240, 232, 5));
+        addToArchiveButton.setForeground(new Color(0,0,0));
+        addToArchiveButton.setFont(BUTTON_FONT);
+        addToArchiveButton.setFocusable(false);
+        addToArchiveButton.addActionListener(this);
 
         jwoFilterButton = new JButton("JWO");
         jwoFilterButton.setBackground(new Color(44, 123, 201));
@@ -284,26 +310,26 @@ public class MainWindow extends JFrame implements ActionListener {
         todayButton.setFocusable(false);
         todayButton.addActionListener(this);
 
-        resetBoardButton = new JButton("Reset Board");
-        resetBoardButton.setBackground(new Color(0, 0, 0));
-        resetBoardButton.setForeground(new Color(255,255,255));
-        resetBoardButton.setFont(BUTTON_FONT);
-        resetBoardButton.setFocusable(false);
-        resetBoardButton.addActionListener(this);
+        activeBoardButton = new JButton("Active Board");
+        activeBoardButton.setBackground(new Color(0, 0, 0));
+        activeBoardButton.setForeground(new Color(255,255,255));
+        activeBoardButton.setFont(BUTTON_FONT);
+        activeBoardButton.setFocusable(false);
+        activeBoardButton.addActionListener(this);
 
-        archiveButton = new JButton("Archive");
-        archiveButton.setBackground(new Color(0, 0, 0));
-        archiveButton.setForeground(new Color(255,255,255));
-        archiveButton.setFont(BUTTON_FONT);
-        archiveButton.setFocusable(false);
-        archiveButton.addActionListener(this);
+        archiveViewButton = new JButton("Archive");
+        archiveViewButton.setBackground(new Color(0, 0, 0));
+        archiveViewButton.setForeground(new Color(255,255,255));
+        archiveViewButton.setFont(BUTTON_FONT);
+        archiveViewButton.setFocusable(false);
+        archiveViewButton.addActionListener(this);
 
-        timeOffButton = new JButton("Time Off");
-        timeOffButton.setBackground(new Color(0, 0, 0));
-        timeOffButton.setForeground(new Color(255,255,255));
-        timeOffButton.setFont(BUTTON_FONT);
-        timeOffButton.setFocusable(false);
-        timeOffButton.addActionListener(this);
+        editDropdownsButton = new JButton("Edit Dropdowns");
+        editDropdownsButton.setBackground(new Color(0, 0, 0));
+        editDropdownsButton.setForeground(new Color(255,255,255));
+        editDropdownsButton.setFont(BUTTON_FONT);
+        editDropdownsButton.setFocusable(false);
+        editDropdownsButton.addActionListener(this);
 
         plusZoomButton = new JButton("+");
         plusZoomButton.setBackground(new Color(0, 0, 0));
@@ -341,6 +367,14 @@ public class MainWindow extends JFrame implements ActionListener {
         timeOffScroll.getVerticalScrollBar().setBackground(new Color(24,24,24));
         timeOffScroll.getHorizontalScrollBar().setBackground(new Color(24,24,24));
 
+        timeOffComboBox = new JComboBox();
+        timeOffComboBox.setEditable(false);
+        timeOffComboBox.setBackground(new Color(60, 60, 60));
+        timeOffComboBox.setForeground(Color.WHITE);
+        timeOffComboBox.setFont(BUTTON_FONT);
+        timeOffComboBox.setBorder(new EmptyBorder(0, 0, 0, 0));
+        timeOffComboBox.setMaximumRowCount(10);
+
         splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, datesPanel);
         splitPane.setDividerSize(5);
         splitPane.setBorder(null);
@@ -350,6 +384,12 @@ public class MainWindow extends JFrame implements ActionListener {
         zoomLabel.setForeground(new Color(255,255,255));
         zoomLabel.setFont(BUTTON_FONT);
         zoomLabel.setFocusable(false);
+
+        timeOffLabel = new JLabel("Time Off: ");
+        timeOffLabel.setBackground(new Color(0, 0, 0));
+        timeOffLabel.setForeground(new Color(255,255,255));
+        timeOffLabel.setFont(BUTTON_FONT);
+        timeOffLabel.setFocusable(false);
 
         TableCustom.apply(tableScroll, TableCustom.TableType.DEFAULT);
         TableCustom.apply(datesScroll, TableCustom.TableType.VERTICAL);
@@ -408,15 +448,15 @@ public class MainWindow extends JFrame implements ActionListener {
         createDataTable();
         createDatesTable();
         populateDatesTable();
-        populateTimeOffTable();
+        //populateTimeOffTable();
         applyZoom();
         if(currentBoardMode == JobBoardMode.ACTIVE_JOBS){
-            resetBoardButton.setForeground(new Color(0, 230, 60));
-            archiveButton.setForeground(new Color(255,255,255));
+            activeBoardButton.setForeground(new Color(0, 230, 60));
+            archiveViewButton.setForeground(new Color(255,255,255));
         }
         else{
-            archiveButton.setForeground(new Color(0, 230, 60));
-            resetBoardButton.setForeground(new Color(255,255,255));
+            archiveViewButton.setForeground(new Color(0, 230, 60));
+            activeBoardButton.setForeground(new Color(255,255,255));
         }
 
         switch (currentFilter.getFilterName()){
@@ -441,11 +481,11 @@ public class MainWindow extends JFrame implements ActionListener {
     }
 
     public void refreshData(){
-        refreshResultSets();
+        jobBoardResultSet = refreshResultSets();
         loadTable();
     }
 
-    public void refreshResultSets(){
+    public ResultSet refreshResultSets(){
         String isActiveValue = "true";
         if(currentBoardMode == JobBoardMode.ARCHIVE){
             isActiveValue = "false";
@@ -457,7 +497,7 @@ public class MainWindow extends JFrame implements ActionListener {
         qbJobBoard.where("is_active = "+isActiveValue);
         qbJobBoard.orderBy(currentFilter);
         qbJobBoard.orderBy(jwoFilter);
-        jobBoardResultSet = database.sendSelect(qbJobBoard.build());
+        return database.sendSelect(qbJobBoard.build());
     }
 
     public void createDataTable(){
@@ -506,6 +546,7 @@ public class MainWindow extends JFrame implements ActionListener {
             dataTable.setModel(dataTableModel);
         }catch (SQLException e){
             JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+            Exceptions.ErrorWriting.logError(e);
             System.exit(1);
         }
     }
@@ -534,6 +575,7 @@ public class MainWindow extends JFrame implements ActionListener {
             }
         }catch (SQLException e){
             JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+            Exceptions.ErrorWriting.logError(e);
             System.exit(1);
         }
 
@@ -547,13 +589,13 @@ public class MainWindow extends JFrame implements ActionListener {
                     for(LocalDate d : saturdayList){
                         if(d.equals(currentDate)) {
                             datesTableModel.addColumn(currentDate.format(dateFormat));
-                            timeOffTableModel.addColumn(currentDate.format(dateFormat));
+                            timeOffTableModel.addColumn(currentDate);
                         }
                     }
                 }
                 else {
                     datesTableModel.addColumn(currentDate.format(dateFormat));
-                    timeOffTableModel.addColumn(currentDate.format(dateFormat));
+                    timeOffTableModel.addColumn(currentDate);
                 }
                 if(currentDate.isEqual(today)){
                     todayCol = datesTableModel.getColumnCount() - 1;
@@ -561,7 +603,7 @@ public class MainWindow extends JFrame implements ActionListener {
             }
             else if(currentDate.isEqual(today)){
                 datesTableModel.addColumn(currentDate.format(dateFormat));
-                timeOffTableModel.addColumn(currentDate.format(dateFormat));
+                timeOffTableModel.addColumn(currentDate);
                 todayCol = datesTableModel.getColumnCount() - 1;
             }
 
@@ -699,18 +741,20 @@ public class MainWindow extends JFrame implements ActionListener {
         datesTable.getTableHeader().setFont(BOLD_FONT);
         timeOffTable.setFont(PLAIN_FONT);
 
-        addJobButton.setFont(BUTTON_FONT);
-        updateJobButton.setFont(BUTTON_FONT);
-        hideJobButton.setFont(BUTTON_FONT);
-        jwoFilterButton.setFont(BUTTON_FONT);
-        customerFilterButton.setFont(BUTTON_FONT);
-        dateFilterButton.setFont(BUTTON_FONT);
-        todayButton.setFont(BUTTON_FONT);
-        resetBoardButton.setFont(BUTTON_FONT);
-        archiveButton.setFont(BUTTON_FONT);
-        timeOffButton.setFont(BUTTON_FONT);
-        plusZoomButton.setFont(BUTTON_FONT);
-        minusZoomButton.setFont(BUTTON_FONT);
+        timeOffLabel.setFont(BOLD_FONT);
+        timeOffComboBox.setFont(BOLD_FONT);
+
+//        addJobButton.setFont(BUTTON_FONT);
+//        updateJobButton.setFont(BUTTON_FONT);
+//        addToArchiveButton.setFont(BUTTON_FONT);
+//        jwoFilterButton.setFont(BUTTON_FONT);
+//        customerFilterButton.setFont(BUTTON_FONT);
+//        dateFilterButton.setFont(BUTTON_FONT);
+//        todayButton.setFont(BUTTON_FONT);
+//        activeBoardButton.setFont(BUTTON_FONT);
+//        archiveViewButton.setFont(BUTTON_FONT);
+//        plusZoomButton.setFont(BUTTON_FONT);
+//        minusZoomButton.setFont(BUTTON_FONT);
 
         setTableFontsAndSizes();
         setTableFontsAndSizes();
@@ -720,7 +764,7 @@ public class MainWindow extends JFrame implements ActionListener {
 
         setDividerLocation();
         syncScrollPanes();
-        resetDatesScrollBar();
+        //resetDatesScrollBar();
     }
 
     // Populate dates table with colored days
@@ -842,6 +886,7 @@ public class MainWindow extends JFrame implements ActionListener {
             }
         }catch (SQLException e){
             JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+            Exceptions.ErrorWriting.logError(e);
             System.exit(1);
         }
 
@@ -854,37 +899,21 @@ public class MainWindow extends JFrame implements ActionListener {
         qb.select("*");
         qb.from("time_off");
         ResultSet rs = database.sendSelect(qb.build());
-
-        ArrayList<TimeOffDates> timeOffDatesList = new ArrayList<>();
-
-        int personIndex = 1;
+        timeOffValues.clear();
         try {
             while (rs.next()) {
-                personIndex = rs.findColumn("worker");
-
-                Date sqlDate = rs.getDate("start_date");
-                LocalDate startDate = sqlDate.toLocalDate();
-
-                sqlDate = rs.getDate("end_date");
-                LocalDate endDate = sqlDate.toLocalDate();
-
-                ArrayList<LocalDate> timeOffDates = new ArrayList<>();
-                LocalDate currentDate = startDate;
-
-                while (currentDate.isBefore(endDate)) {
-                    if (currentDate.getDayOfWeek() != DayOfWeek.SATURDAY && currentDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
-                        timeOffDates.add(currentDate);
+                String worker = rs.getString(1);
+                LocalDate date = rs.getDate(2).toLocalDate();
+                for(int i = 0; i < timeOffTable.getColumnCount(); i++) {
+                    if(timeOffTable.getColumnModel().getColumn(i).getHeaderValue().toString().equals(date.toString())){
+                        timeOffValues.add(new TimeOffValue(worker, i));
+                        break;
                     }
-                    currentDate = currentDate.plusDays(1);
                 }
-                timeOffDates.add(currentDate);
-                timeOffDatesList.add(new TimeOffDates(rs.getString(personIndex), timeOffDates));
             }
         }catch (SQLException e){
-            JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
-            System.exit(1);
+            e.printStackTrace();
         }
-        TableCustom.applyTimeOffDates(timeOffTable, timeOffDatesList);
     }
 
     // syncs both scroll bars in dataTable and datesTable to move together
@@ -1042,6 +1071,7 @@ public class MainWindow extends JFrame implements ActionListener {
                                     database.sendUpdate(qb.build());
                                 } catch (SQLException e) {
                                     JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+                                    Exceptions.ErrorWriting.logError(e);
                                     System.exit(1);
                                 }
                                 return super.stopCellEditing();
@@ -1125,6 +1155,7 @@ public class MainWindow extends JFrame implements ActionListener {
                                     database.sendUpdate(qb.build());
                                 } catch (SQLException e) {
                                     JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+                                    Exceptions.ErrorWriting.logError(e);
                                     System.exit(1);
                                 }
                             } else {
@@ -1148,20 +1179,78 @@ public class MainWindow extends JFrame implements ActionListener {
             }
         }catch (SQLException e){
             JOptionPane.showMessageDialog(null, e.getMessage() + "\nSystem exiting for safety...");
+            Exceptions.ErrorWriting.logError(e);
             System.exit(1);
         }
 
     }
 
+    public void setTimeOffComboBox(){
+        Properties props = new Properties();
+        try {
+            FileInputStream input = new FileInputStream(PropertiesManager.DROPDOWN_OPTIONS_PROPERTIES_FILE_PATH);
+            props.load(input);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        timeOffComboBox.setModel(new DefaultComboBoxModel(props.getProperty("worker_list.dropdown.options").split(",")));
+    }
+
+    public void setTimeOffTableFunction(){
+        timeOffValues = new ArrayList<>();
+        setTimeOffComboBox();
+        timeOffTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int col = timeOffTable.columnAtPoint(e.getPoint());
+                String worker = (String)timeOffComboBox.getSelectedItem();
+                System.out.println(worker);
+                if(worker.isBlank())
+                    return;
+                String date = timeOffTable.getColumnModel().getColumn(col).getHeaderValue().toString();
+                System.out.println(date);
+                TimeOffValue clickedValue = null;
+
+                for(TimeOffValue v : timeOffValues){
+                    if(v.getWorker().equals(worker) && v.getCol() == col){
+                        clickedValue = v;
+                        break;
+                    }
+                }
+
+                if(clickedValue == null){
+                    timeOffValues.add(new TimeOffValue(worker, col));
+                    try {
+                        database.sendUpdate(String.format("INSERT INTO time_off VALUES ('%s', '%s')", worker, date));
+                    } catch (SQLException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+                else{
+                    timeOffValues.remove(clickedValue);
+                    try {
+                        database.sendUpdate(String.format("DELETE FROM time_off WHERE worker = '%s' and selected_day = '%s';", worker, date));
+                    } catch (SQLException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+
+                timeOffTable.revalidate();
+                timeOffTable.repaint();
+            }
+        });
+    }
+
     private AddJobWindow addJobWindow = null;
     private UpdateJobWindow updateJobWindow = null;
     private HideJobWindow hideJobWindow = null;
-    private AddTimeOffWindow addTimeOffWindow = null;
+    private EditDropdownsWindow editDropdownsWindow = null;
     @Override
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == addJobButton){
             if(addJobWindow == null || !addJobWindow.isDisplayable()) {
-                addJobWindow = new AddJobWindow(database, jobBoardResultSet);
+                addJobWindow = new AddJobWindow(this, refreshResultSets());
                 addJobWindow.addWindowListener(new WindowAdapter() {
                     @Override
                     public void windowClosed(WindowEvent e) {
@@ -1178,7 +1267,7 @@ public class MainWindow extends JFrame implements ActionListener {
                 int selectedRow = dataTable.getSelectedRow();
                 if (selectedRow != -1 && currentBoardMode != JobBoardMode.ARCHIVE) {
                     String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
-                    updateJobWindow = new UpdateJobWindow(database, jobBoardResultSet, selectedJwo);
+                    updateJobWindow = new UpdateJobWindow(this, refreshResultSets(), selectedJwo);
                     updateJobWindow.addWindowListener(new WindowAdapter() {
                         @Override
                         public void windowClosed(WindowEvent e) {
@@ -1191,12 +1280,12 @@ public class MainWindow extends JFrame implements ActionListener {
                 updateJobWindow.toFront();
             }
         }
-        if(e.getSource() == hideJobButton){
+        if(e.getSource() == addToArchiveButton){
             if(hideJobWindow == null || !hideJobWindow.isDisplayable()) {
                 int selectedRow = dataTable.getSelectedRow();
                 if(selectedRow != -1) {
                     String selectedJwo = dataTable.getValueAt(selectedRow, dataTable.getColumnModel().getColumnIndex("jwo")).toString();
-                    hideJobWindow = new HideJobWindow(selectedJwo, currentBoardMode);
+                    hideJobWindow = new HideJobWindow(this, selectedJwo, currentBoardMode);
                     hideJobWindow.addWindowListener(new WindowAdapter() {
                         @Override
                         public void windowClosed(WindowEvent e) {
@@ -1224,37 +1313,41 @@ public class MainWindow extends JFrame implements ActionListener {
         if(e.getSource() == todayButton) {
             resetDatesScrollBar();
         }
-        if(e.getSource() == resetBoardButton) {
+        if(e.getSource() == activeBoardButton) {
             currentBoardMode = JobBoardMode.ACTIVE_JOBS;
+            addToArchiveButton.setText("Archive");
             refreshData();
         }
-        if(e.getSource() == archiveButton) {
+        if(e.getSource() == archiveViewButton) {
             currentBoardMode = JobBoardMode.ARCHIVE;
+            addToArchiveButton.setText("Un-Archive");
             refreshData();
         }
 
-        if(e.getSource() == timeOffButton){
-            if(addTimeOffWindow == null || !addTimeOffWindow.isDisplayable()) {
-                addTimeOffWindow = new AddTimeOffWindow(database);
-                addTimeOffWindow.addWindowListener(new WindowAdapter() {
+        if(e.getSource() == editDropdownsButton){
+            if(editDropdownsWindow == null || !editDropdownsWindow.isDisplayable()) {
+                editDropdownsWindow = new EditDropdownsWindow(this);
+                editDropdownsWindow.addWindowListener(new WindowAdapter() {
                     @Override
                     public void windowClosed(WindowEvent e) {
-                        addTimeOffWindow = null;
+                        addJobWindow = null;
                     }
                 });
             }
             else{
-                addTimeOffWindow.toFront();
+                addJobWindow.toFront();
             }
         }
 
         if(e.getSource() == plusZoomButton) {
             ZoomManager.increaseZoom();
             applyZoom();
+            resetDatesScrollBar();
         }
         if(e.getSource() == minusZoomButton) {
             ZoomManager.decreaseZoom();
             applyZoom();
+            resetDatesScrollBar();
         }
     }
 
