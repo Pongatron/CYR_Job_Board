@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/DatabaseInteractionExperiment.iml" filepath="$PROJECT_DIR$/DatabaseInteractionExperiment.iml" />
+      <module fileurl="file://$PROJECT_DIR$/CYR_Job_Board.iml" filepath="$PROJECT_DIR$/CYR_Job_Board.iml" />
     </modules>
   </component>
 </project>
