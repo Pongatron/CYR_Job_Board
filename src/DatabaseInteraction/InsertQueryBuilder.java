@@ -22,6 +22,10 @@ public class InsertQueryBuilder {
     }
     public void setValues(String ... values){
         for(String s : values){
+            if(s.contains("'")) {
+                System.out.println("copntains '");
+                s = s.replace("'", "''");
+            }
             this.values.add(s);
         }
     }
