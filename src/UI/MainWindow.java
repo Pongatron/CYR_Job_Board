@@ -481,8 +481,31 @@ public class MainWindow extends JFrame implements ActionListener {
     }
 
     public void refreshData(){
+        int selectedRow = dataTable.getSelectedRow();
+        int selectedCol = dataTable.getSelectedColumn();
+
+        Object selectedJWO = null;
+        if(selectedRow != -1 && dataTable.getModel().getColumnCount() > 0){
+            selectedJWO = dataTable.getModel().getValueAt(selectedRow, 0);
+        }
+
         jobBoardResultSet = refreshResultSets();
         loadTable();
+
+        if(selectedJWO != null){
+            for(int row = 0; row < dataTable.getRowCount(); row++){
+                Object rowJWO = dataTable.getModel().getValueAt(row, 0);
+                System.out.println("row JWO: "+rowJWO);
+                System.out.println("selected jwo: "+selectedJWO);
+                if(selectedJWO.equals(rowJWO)){
+                    dataTable.setRowSelectionInterval(row, row);
+                    if(selectedCol != -1){
+                        dataTable.setColumnSelectionInterval(selectedCol, selectedCol);
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     public ResultSet refreshResultSets(){
