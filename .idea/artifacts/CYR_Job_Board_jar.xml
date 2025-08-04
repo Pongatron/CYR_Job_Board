@@ -2,6 +2,9 @@
   <artifact type="jar" name="CYR_Job_Board:jar">
     <output-path>$PROJECT_DIR$/out/artifacts/CYR_Job_Board_jar</output-path>
     <root id="archive" name="CYR_Job_Board.jar">
+      <element id="directory" name="META-INF">
+        <element id="file-copy" path="$PROJECT_DIR$/resources/Main-App/META-INF/MANIFEST.MF" />
+      </element>
       <element id="module-output" name="CYR_Job_Board" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/com/google/code/gson/gson/2.13.1/gson-2.13.1.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/com/google/errorprone/error_prone_annotations/2.38.0/error_prone_annotations-2.38.0.jar" path-in-jar="/" />

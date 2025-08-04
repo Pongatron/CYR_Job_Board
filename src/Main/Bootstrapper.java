@@ -24,7 +24,7 @@ public class Bootstrapper {
     // Use File.separator for cross-platform compatibility
     private static final String VERSION_FILE = APP_DATA_DIR + File.separator + "version.txt";
     private static final String MAIN_APP_PATH = "C:\\Program Files\\CYR_Job_Board\\CYR_Job_Board.exe";
-    private static final Path MSI_DOWNLOAD_PATH = Paths.get("update.msi");
+    private static final Path MSI_DOWNLOAD_PATH = Paths.get( APP_DATA_DIR + File.separator + "update.msi");
 
     private static final String GITHUB_TOKEN = "";
 
@@ -38,7 +38,8 @@ public class Bootstrapper {
 
             String currentVersion = readLocalVersion();
 
-            JsonObject releaseDetails = fetchLatestReleaseDetails();
+            System.out.println(currentVersion);
+            JsonObject releaseDetails = fetchLatestMainAppRelease();
 
             if (releaseDetails == null) {
                 System.err.println("[Bootstrapper] Could not retrieve release details. Launching existing app.");
@@ -47,8 +48,9 @@ public class Bootstrapper {
             }
 
             String latestVersion = releaseDetails.get("tag_name").getAsString();
+            System.out.println(latestVersion);
 
-            if (!currentVersion.equals(latestVersion)) {
+            if (!currentVersion.equals(latestVersion) && latestVersion.contains("Main-App-")) {
                 System.out.println("[Bootstrapper] Update found: " + latestVersion);
 
                 int result = JOptionPane.showConfirmDialog(null, "A newer version was found. Do you want to install it?", null, JOptionPane.YES_NO_OPTION);
@@ -64,6 +66,9 @@ public class Bootstrapper {
                     downloadFile(msiUrl, MSI_DOWNLOAD_PATH);
                     runInstaller(MSI_DOWNLOAD_PATH);
                     writeLocalVersion(latestVersion);
+
+                    System.out.println("[Bootstrapper] Deleting temporary update file...");
+                    Files.deleteIfExists(MSI_DOWNLOAD_PATH);
                 }
             } else {
                 System.out.println("[Bootstrapper] Already up to date.");
@@ -78,14 +83,22 @@ public class Bootstrapper {
         }
     }
 
-    private static JsonObject fetchLatestReleaseDetails() throws IOException, InterruptedException {
-        String url = "https://api.github.com/repos/" + REPO_OWNER + "/" + REPO_NAME + "/releases/latest";
+    private static JsonObject fetchLatestMainAppRelease() throws IOException, InterruptedException {
+        String url = "https://api.github.com/repos/" + REPO_OWNER + "/" + REPO_NAME + "/releases";
+        HttpRequest request = null;
+        if(!GITHUB_TOKEN.isBlank()){
+            request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Accept", "application/vnd.github.v3+json")
+                    .header("Authorization", "Bearer " + GITHUB_TOKEN)
+                    .build();
+        }else{
+            request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Accept", "application/vnd.github.v3+json")
+                    .build();
+        }
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Accept", "application/vnd.github.v3+json")
-                .header("Authorization", "Bearer " + GITHUB_TOKEN)
-                .build();
 
         HttpClient client = HttpClient.newHttpClient();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
@@ -95,7 +108,17 @@ public class Bootstrapper {
             return null;
         }
 
-        return JsonParser.parseString(response.body()).getAsJsonObject();
+        JsonArray releases = JsonParser.parseString(response.body()).getAsJsonArray();
+
+        for(JsonElement releaseElement : releases){
+            JsonObject release = releaseElement.getAsJsonObject();
+            String tagName = release.get("tag_name").getAsString();
+            if(tagName.startsWith("Main-App-")){
+                return release;
+            }
+        }
+
+        return null;
     }
 
     private static String getMsiDownloadUrlFromDetails(JsonObject releaseDetails) {
@@ -110,12 +133,30 @@ public class Bootstrapper {
         return null;
     }
 
+    private static boolean mainAppExists(){
+        File mainApp = new File(MAIN_APP_PATH);
+        return mainApp.exists();
+    }
+
     private static String readLocalVersion(){
-        try{
-            return Files.readString(Path.of(VERSION_FILE)).trim();
-        } catch (IOException e) {
-            return "v0.0.0";
+        Path versionPath = Path.of(VERSION_FILE);
+        String defaultVersion = "Main-App-v0.0.0";
+
+        System.out.println(mainAppExists());
+
+        try {
+            if (!mainAppExists() || !Files.exists(versionPath)) {
+                Files.writeString(versionPath, defaultVersion, StandardOpenOption.CREATE);
+                return defaultVersion;
+            }
+
+            return Files.readString(versionPath).trim();
+        }catch (IOException e){
+            System.err.println("[Bootstrapper] Failed to read or create version file.");
+            e.printStackTrace();
+            return defaultVersion;
         }
+
     }
 
     private static void writeLocalVersion(String version) throws IOException{
