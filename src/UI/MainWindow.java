@@ -147,7 +147,7 @@ public class MainWindow extends JFrame implements ActionListener {
         databaseListenerThread.start();
 
 
-        Image icon = Toolkit.getDefaultToolkit().getImage("resources/cyr-logo-white.png");
+        Image icon = Toolkit.getDefaultToolkit().getImage(getClass().getClassLoader().getResource("cyr-logo-white.png"));
         this.setIconImage(icon);
 
         buttonPanel.add(addJobButton);
