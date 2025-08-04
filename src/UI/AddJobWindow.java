@@ -74,7 +74,7 @@ public class AddJobWindow extends JFrame implements ActionListener {
         centerPanel.setBorder(new EmptyBorder(10,10,10,10));
 
         fieldsPanel = new JPanel();
-        fieldsPanel.setLayout(new GridLayout(0, 1, 0,10));
+        fieldsPanel.setLayout(new BoxLayout(fieldsPanel, BoxLayout.Y_AXIS));
         fieldsPanel.setBackground(new Color(40,40,40));
         fieldsPanel.setBorder(new EmptyBorder(5,5,5,5));
 
@@ -106,16 +106,6 @@ public class AddJobWindow extends JFrame implements ActionListener {
             @Override
             public void actionPerformed(ActionEvent e) {
                 createButton.doClick(); // simulate button press
-            }
-        });
-
-        this.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentMoved(ComponentEvent e) {
-                SwingUtilities.invokeLater(() -> {
-                    AddJobWindow.this.revalidate();
-                    AddJobWindow.this.repaint();
-                });
             }
         });
     }
@@ -200,12 +190,13 @@ public class AddJobWindow extends JFrame implements ActionListener {
                     textField.setBackground(new Color(60, 60, 60));
                     textField.setForeground(Color.WHITE);
                     textField.setFont(new Font("SansSerif", Font.PLAIN, 20));
-                    textField.setBorder(new EmptyBorder(5, 5, 5, 5));
+                    textField.setBorder(new EmptyBorder(0, 5, 0, 0));
                     text = textField;
                 }
 
                 JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
                 panel.setBackground(new Color(40, 40, 40));
+                panel.setBorder(new EmptyBorder(5,5,5,5));
                 panel.add(label);
                 panel.add(text);
                 fields.add(panel);

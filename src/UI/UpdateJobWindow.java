@@ -82,7 +82,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
         centerPanel.setBorder(new EmptyBorder(10,10,10,10));
 
         fieldsPanel = new JPanel();
-        fieldsPanel.setLayout(new GridLayout(0, 1, 0,10));
+        fieldsPanel.setLayout(new BoxLayout(fieldsPanel, BoxLayout.Y_AXIS));
         fieldsPanel.setBackground(new Color(40,40,40));
         fieldsPanel.setBorder(new EmptyBorder(5,5,5,5));
 
@@ -113,7 +113,7 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
         rootPane.getActionMap().put("confirm", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                updateButton.doClick(); // simulate button press
+                updateButton.doClick();
             }
         });
     }
@@ -214,12 +214,13 @@ public class UpdateJobWindow extends JFrame implements ActionListener {
                     textField.setBackground(new Color(60, 60, 60));
                     textField.setForeground(Color.WHITE);
                     textField.setFont(new Font("SansSerif", Font.PLAIN, 20));
-                    textField.setBorder(new EmptyBorder(5, 5, 5, 5));
+                    textField.setBorder(new EmptyBorder(0, 5, 0, 0));
                     text = textField;
                 }
 
                 JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
                 panel.setBackground(new Color(40, 40, 40));
+                panel.setBorder(new EmptyBorder(5,5,5,5));
                 panel.add(label);
                 panel.add(text);
                 fields.add(panel);

@@ -13,8 +13,12 @@ import java.awt.*;
 import java.awt.event.*;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.sql.*;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -29,7 +33,6 @@ import static DatabaseInteraction.Filter.FilterStatus.*;
 public class MainWindow extends JFrame implements ActionListener {
 
     public enum JobBoardMode {ACTIVE_JOBS, ARCHIVE}
-
 
     private static  int ABSOLUTE_MIN_CELL_WIDTH = 50;
     private static  int MAX_CELL_WIDTH = 400;
@@ -83,6 +86,7 @@ public class MainWindow extends JFrame implements ActionListener {
     private int todayCol = -1;
     private JLabel zoomLabel;
     private JLabel timeOffLabel;
+    private JLabel versionLabel;
 
     public static ArrayList<TimeOffValue> timeOffValues;
     private JComboBox timeOffComboBox;
@@ -102,6 +106,7 @@ public class MainWindow extends JFrame implements ActionListener {
         setTimeOffTableFunction();
         populateTimeOffTable();
         resetDatesScrollBar();
+        setVersion();
 
 
         Thread databaseListenerThread = new Thread(()->{
@@ -165,6 +170,7 @@ public class MainWindow extends JFrame implements ActionListener {
         topContainerPanel.add(minusZoomButton);
         topContainerPanel.add(zoomLabel);
         topContainerPanel.add(plusZoomButton);
+        topContainerPanel.add(versionLabel);
 
         aboveDataPanel.add(timeOffLabel);
         aboveDataPanel.add(timeOffComboBox);
@@ -204,7 +210,6 @@ public class MainWindow extends JFrame implements ActionListener {
 
     public void initializeComponents(){
         dataTable = new JTable();
-        //dataTable.getTableHeader().addMouseListener(this);
         dataTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         dataTable.setDefaultEditor(Object.class, null);
         dataTable.getTableHeader().setReorderingAllowed(false);
@@ -388,8 +393,14 @@ public class MainWindow extends JFrame implements ActionListener {
         timeOffLabel = new JLabel("Time Off: ");
         timeOffLabel.setBackground(new Color(0, 0, 0));
         timeOffLabel.setForeground(new Color(255,255,255));
-        timeOffLabel.setFont(BUTTON_FONT);
+        timeOffLabel.setFont(BOLD_FONT);
         timeOffLabel.setFocusable(false);
+
+        versionLabel = new JLabel("v0.0.0");
+        versionLabel.setBackground(new Color(0, 0, 0));
+        versionLabel.setForeground(new Color(100,100,100));
+        versionLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        versionLabel.setFocusable(false);
 
         TableCustom.apply(tableScroll, TableCustom.TableType.DEFAULT);
         TableCustom.apply(datesScroll, TableCustom.TableType.VERTICAL);
@@ -448,7 +459,6 @@ public class MainWindow extends JFrame implements ActionListener {
         createDataTable();
         createDatesTable();
         populateDatesTable();
-        //populateTimeOffTable();
         applyZoom();
         if(currentBoardMode == JobBoardMode.ACTIVE_JOBS){
             activeBoardButton.setForeground(new Color(0, 230, 60));
@@ -480,33 +490,66 @@ public class MainWindow extends JFrame implements ActionListener {
         }
     }
 
-    public void refreshData(){
+    public void refreshData() {
         int selectedRow = dataTable.getSelectedRow();
         int selectedCol = dataTable.getSelectedColumn();
 
-        Object selectedJWO = null;
-        if(selectedRow != -1 && dataTable.getModel().getColumnCount() > 0){
-            selectedJWO = dataTable.getModel().getValueAt(selectedRow, 0);
+        Object selectedId = null;
+        if (selectedRow != -1 && dataTable.getModel().getColumnCount() > 0) {
+            selectedId = dataTable.getModel().getValueAt(selectedRow, 0);
         }
 
+        // Save edit state
+        boolean wasEditing = dataTable.isEditing();
+        int editingRow = dataTable.getEditingRow();
+        int editingCol = dataTable.getEditingColumn();
+        Object editorValue = null;
+
+        if (wasEditing && editingRow != -1 && editingCol != -1) {
+            TableCellEditor editor = dataTable.getCellEditor();
+            if (editor != null) {
+                editorValue = editor.getCellEditorValue();
+            }
+        }
+
+        // Reload data
         jobBoardResultSet = refreshResultSets();
         loadTable();
 
-        if(selectedJWO != null){
-            for(int row = 0; row < dataTable.getRowCount(); row++){
-                Object rowJWO = dataTable.getModel().getValueAt(row, 0);
-                System.out.println("row JWO: "+rowJWO);
-                System.out.println("selected jwo: "+selectedJWO);
-                if(selectedJWO.equals(rowJWO)){
+        // Restore selection
+        if (selectedId != null) {
+            for (int row = 0; row < dataTable.getRowCount(); row++) {
+                Object rowId = dataTable.getModel().getValueAt(row, 0);
+                if (selectedId.equals(rowId)) {
                     dataTable.setRowSelectionInterval(row, row);
-                    if(selectedCol != -1){
-                        dataTable.setColumnSelectionInterval(selectedCol, selectedCol);
+                    dataTable.setColumnSelectionInterval(selectedCol, selectedCol);
+
+                    // Restore editing state
+                    if (wasEditing && editorValue != null) {
+                        final int finalRow = row;
+                        final int finalCol = selectedCol;
+                        final Object finalEditorValue = editorValue;
+
+                        SwingUtilities.invokeLater(() -> {
+                            dataTable.editCellAt(finalRow, finalCol);
+                            Component editorComponent = dataTable.getEditorComponent();
+
+                            if (editorComponent instanceof JTextField textField) {
+                                textField.setText(finalEditorValue.toString());
+                                textField.setCaretPosition(textField.getText().length());
+                                textField.requestFocusInWindow();
+                            } else if (editorComponent instanceof JComboBox comboBox) {
+                                comboBox.setSelectedItem(finalEditorValue);
+                            }
+                        });
                     }
+
                     break;
                 }
             }
         }
     }
+
 
     public ResultSet refreshResultSets(){
         String isActiveValue = "true";
@@ -766,18 +809,6 @@ public class MainWindow extends JFrame implements ActionListener {
 
         timeOffLabel.setFont(BOLD_FONT);
         timeOffComboBox.setFont(BOLD_FONT);
-
-//        addJobButton.setFont(BUTTON_FONT);
-//        updateJobButton.setFont(BUTTON_FONT);
-//        addToArchiveButton.setFont(BUTTON_FONT);
-//        jwoFilterButton.setFont(BUTTON_FONT);
-//        customerFilterButton.setFont(BUTTON_FONT);
-//        dateFilterButton.setFont(BUTTON_FONT);
-//        todayButton.setFont(BUTTON_FONT);
-//        activeBoardButton.setFont(BUTTON_FONT);
-//        archiveViewButton.setFont(BUTTON_FONT);
-//        plusZoomButton.setFont(BUTTON_FONT);
-//        minusZoomButton.setFont(BUTTON_FONT);
 
         setTableFontsAndSizes();
         setTableFontsAndSizes();
@@ -1261,6 +1292,21 @@ public class MainWindow extends JFrame implements ActionListener {
                 timeOffTable.repaint();
             }
         });
+    }
+
+    public void setVersion(){
+        Path versionPath = Path.of(PropertiesManager.APP_DATA_DIR + File.separator + "version.txt");
+        String defaultVersion = "Main-App-Error-Loading-Version";
+
+        String version = defaultVersion;
+
+        try {
+            version = Files.readString(versionPath).trim();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        versionLabel.setText(version);
     }
 
     private AddJobWindow addJobWindow = null;

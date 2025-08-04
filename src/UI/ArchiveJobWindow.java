@@ -118,7 +118,7 @@ public class ArchiveJobWindow extends JFrame implements ActionListener {
 
     public void populateFieldsPanel(){
 
-        JLabel confirmationLabel = new JLabel("<html><div style='text-align: center;'>Set job as Active or Archived<br>('t' is active, 'f' is archived)</div></html>");
+        JLabel confirmationLabel = new JLabel("Set job as Active or Archived");
         confirmationLabel.setForeground(Color.white);
         confirmationLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
         confirmationLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -131,13 +131,13 @@ public class ArchiveJobWindow extends JFrame implements ActionListener {
         jwoLabel.setBorder(new EmptyBorder(0,0,0,0));
         jwoLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
-        JLabel isActiveLabel = new JLabel("Active? :");
+        JLabel isActiveLabel = new JLabel("Status :");
         isActiveLabel.setForeground(Color.white);
         isActiveLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
         isActiveLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
-        String[] options = new String[]{"t", "f"};
-        if(currentBoardMode == MainWindow.JobBoardMode.ARCHIVE){options = new String[]{"f", "t"};}
+        String[] options = new String[]{"Active", "Archived"};
+        if(currentBoardMode == MainWindow.JobBoardMode.ARCHIVE){options = new String[]{"Archived", "Active"};}
         comboBox = new JComboBox<>(options);
         comboBox.setPreferredSize(new Dimension(200, 30));
         comboBox.setEditable(false);
@@ -205,15 +205,23 @@ public class ArchiveJobWindow extends JFrame implements ActionListener {
             if(currentBoardMode == MainWindow.JobBoardMode.ARCHIVE && !enteredPassword.equals(HIDE_PASSWORD)){
                 wrongPasswordLabel.setVisible(true);
             }
-            else if(selectedItem.equals("t") && currentBoardMode == MainWindow.JobBoardMode.ACTIVE_JOBS ||
-                    selectedItem.equals("f") && currentBoardMode == MainWindow.JobBoardMode.ARCHIVE){
+            else if(selectedItem.equals("Active") && currentBoardMode == MainWindow.JobBoardMode.ACTIVE_JOBS ||
+                    selectedItem.equals("Archived") && currentBoardMode == MainWindow.JobBoardMode.ARCHIVE){
                 JOptionPane.showMessageDialog(this, "Job Active status is unchanged. Set status or cancel", null, JOptionPane.ERROR_MESSAGE);
             }
             else{
+                String activeStatus = "t";
+                if(selectedItem.equals("Active")){
+                    activeStatus = "t";
+                }
+                else{
+                    activeStatus = "f";
+                }
+
                 UpdateQueryBuilder qb = new UpdateQueryBuilder();
                 qb.updateTable("job_board");
                 qb.setColNames("is_active");
-                qb.setValues(selectedItem);
+                qb.setValues(activeStatus);
                 qb.where("jwo = " + selectedJwo);
                 try {
                     database.sendUpdate(qb.build());

@@ -170,7 +170,7 @@ public class EditDropdownsWindow extends JFrame implements ActionListener {
             });
 
             JTextField textField = new JTextField();
-            textField.setPreferredSize(new Dimension(250, 30));
+            textField.setPreferredSize(new Dimension(150, 30));
             textField.setCaretColor(Color.white);
             textField.setBackground(new Color(60, 60, 60));
             textField.setForeground(Color.WHITE);
@@ -224,7 +224,7 @@ public class EditDropdownsWindow extends JFrame implements ActionListener {
                     });
 
                     JTextField textField = new JTextField();
-                    textField.setPreferredSize(new Dimension(250, 30));
+                    textField.setPreferredSize(new Dimension(150, 30));
                     textField.setCaretColor(Color.white);
                     textField.setBackground(new Color(60, 60, 60));
                     textField.setForeground(Color.WHITE);
@@ -265,50 +265,10 @@ public class EditDropdownsWindow extends JFrame implements ActionListener {
         scrollPane.setBorder(new EmptyBorder(0,0,0,0));
         scrollPane.getVerticalScrollBar().setUnitIncrement(5);
 
-        JLabel passwordLabel = new JLabel("Password: ");
-        passwordLabel.setForeground(Color.white);
-        passwordLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
-
-        passwordText = new JPasswordField();
-        passwordText.setPreferredSize(new Dimension(200, 30));
-        passwordText.setCaretColor(Color.white);
-        passwordText.setBackground(new Color(60, 60, 60));
-        passwordText.setForeground(Color.WHITE);
-        passwordText.setFont(new Font("SansSerif", Font.PLAIN, 20));
-        passwordText.setBorder(new EmptyBorder(5,5,5,5));
-        passwordText.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                wrongPasswordLabel.setVisible(false);
-            }
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                wrongPasswordLabel.setVisible(false);
-            }
-            @Override
-            public void changedUpdate(DocumentEvent e) {}
-        });
-
-        JPanel passwordPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
-        passwordPanel.setBackground(new Color(40, 40, 40));
-        passwordPanel.add(passwordLabel);
-        passwordPanel.add(passwordText);
-
-        wrongPasswordLabel = new JLabel("Wrong Password");
-        wrongPasswordLabel.setForeground(new Color(200,40,40));
-        wrongPasswordLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
-        wrongPasswordLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        wrongPasswordLabel.setVisible(false);
-
-
         fieldsPanel.add(headingLabel);
         fieldsPanel.add(comboBox);
         fieldsPanel.add(Box.createVerticalStrut(10));
         fieldsPanel.add(scrollPane);
-        fieldsPanel.add(Box.createVerticalStrut(10));
-        fieldsPanel.add(passwordPanel);
-        fieldsPanel.add(Box.createVerticalStrut(10));
-        fieldsPanel.add(wrongPasswordLabel);
     }
 
 
@@ -317,49 +277,43 @@ public class EditDropdownsWindow extends JFrame implements ActionListener {
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == confirmButton){
 
-            String enteredPassword = new String(passwordText.getPassword());
-            if(!enteredPassword.equals(EDIT_DROPDOWNS_PASSWORD)){
-                wrongPasswordLabel.setVisible(true);
+            String selectedList = (String) comboBox.getSelectedItem();
+            if(selectedList.isBlank()){
+                JOptionPane.showMessageDialog(this, "No list was selected to Edit. Select a list or cancel");
+                return;
             }
-            else {
-                String selectedList = (String) comboBox.getSelectedItem();
-                if(selectedList.isBlank()){
-                    JOptionPane.showMessageDialog(this, "No list was selected to Edit. Select a list or cancel");
-                    return;
+
+            ArrayList<String> newOptionsList = new ArrayList<>();
+            for (JPanel p : fields) {
+                JTextField textField = (JTextField) p.getComponent(1);
+                String newOption = textField.getText();
+
+                for (String s : oldOptions) {
+                    if (!s.equals(newOption) && !newOption.isBlank()) {
+                        newOptionsList.add(newOption);
+                        break;
+                    }
                 }
 
-                ArrayList<String> newOptionsList = new ArrayList<>();
-                for (JPanel p : fields) {
-                    JTextField textField = (JTextField) p.getComponent(1);
-                    String newOption = textField.getText();
+            }
 
-                    for (String s : oldOptions) {
-                        if (!s.equals(newOption) && !newOption.isBlank()) {
-                            newOptionsList.add(newOption);
-                            break;
-                        }
+
+            if (selectedList.equals("mechanic"))
+                selectedList = "worker";
+
+            if (!selectedList.isBlank()) {
+                try {
+                    database.sendUpdate("delete from " + selectedList + "_list;");
+                    InsertQueryBuilder qb = new InsertQueryBuilder();
+                    qb.insertInto(selectedList + "_list");
+                    for (String s : newOptionsList) {
+                        qb.setValues(s);
                     }
-
-                }
-
-
-                if (selectedList.equals("mechanic"))
-                    selectedList = "worker";
-
-                if (!selectedList.isBlank()) {
-                    try {
-                        database.sendUpdate("delete from " + selectedList + "_list;");
-                        InsertQueryBuilder qb = new InsertQueryBuilder();
-                        qb.insertInto(selectedList + "_list");
-                        for (String s : newOptionsList) {
-                            qb.setValues(s);
-                        }
-                        database.sendUpdate(qb.build());
-                        JOptionPane.showMessageDialog(this, selectedList + " dropdown options have been updated.");
-                        dispose();
-                    } catch (SQLException ex) {
-                        ex.printStackTrace();
-                    }
+                    database.sendUpdate(qb.build());
+                    JOptionPane.showMessageDialog(this, selectedList + " dropdown options have been updated.");
+                    dispose();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
                 }
             }
         }
