@@ -8,6 +8,7 @@ import org.postgresql.PGNotification;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.event.*;
+import javax.swing.plaf.basic.BasicScrollBarUI;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -177,7 +178,6 @@ public class MainWindow extends JFrame implements ActionListener {
 
         leftPanel.add(aboveDataPanel, BorderLayout.NORTH);
         leftPanel.add(tableScroll, BorderLayout.CENTER);
-        setDividerLocation();
 
         datesPanel.add(timeOffScroll, BorderLayout.NORTH);
         datesPanel.add(datesScroll, BorderLayout.CENTER);
@@ -206,6 +206,7 @@ public class MainWindow extends JFrame implements ActionListener {
         this.setExtendedState(JFrame.MAXIMIZED_BOTH);
         this.setLocationRelativeTo(null);
         this.setVisible(true);
+        SwingUtilities.invokeLater(()->{setDividerLocation();});
     }
 
     public void initializeComponents(){
@@ -357,6 +358,7 @@ public class MainWindow extends JFrame implements ActionListener {
         tableScroll.getViewport().setBackground(new Color(24,24,24));
         tableScroll.getVerticalScrollBar().setBackground(new Color(24,24,24));
         tableScroll.getHorizontalScrollBar().setBackground(new Color(24,24,24));
+        tableScroll.getVerticalScrollBar().setPreferredSize(new Dimension(0,0));
 
         datesScroll = new JScrollPane(datesTable);
         datesScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
