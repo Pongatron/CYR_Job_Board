@@ -16,7 +16,7 @@ public class TableCustom {
     public static final Color GRIDLINE_COLOR = new Color(70,70,70);
     public static final Color HEADERTEXT_COLOR = new Color(255,255,255);
     public static final Color HEADERCELL_COLOR = new Color(50,50,50);
-    public static final Color SELECTION_COLOR = new Color(0, 33, 100);
+    public static final Color SELECTION_COLOR = new Color(100, 145, 145);
 
     public static void apply(JScrollPane scroll, TableType type){
         JTable table = (JTable) scroll.getViewport().getComponent(0);
