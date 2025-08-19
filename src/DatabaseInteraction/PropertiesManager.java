@@ -217,6 +217,13 @@ public class PropertiesManager {
                 while (resultSet.next()) {
                     String key = resultSet.getString(config.keyColIndex);
                     String value = resultSet.getString(config.valueColIndex);
+
+                    //quick fix to make mechanic column editable
+                    if(key.equals("mechanic") && config.valueColIndex == cellsEditableCol){
+                        System.out.println("gruh");
+                        value = "t";
+                    }
+                    //---------
                     if (!value.equals(props.getProperty(key))) {
                         props.setProperty(key, value);
                         propertiesChanged = true;
